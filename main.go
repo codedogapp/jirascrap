@@ -6,6 +6,7 @@ import (
 
 	"github.com/codedogapp/jirascrap/internal/config"
 	"github.com/codedogapp/jirascrap/internal/jira"
+	"github.com/codedogapp/jirascrap/internal/store"
 	"github.com/codedogapp/jirascrap/internal/tui"
 )
 
@@ -18,7 +19,15 @@ func main() {
 
 	apiClient := jira.NewClient(config)
 
-	err = tui.Run(apiClient)
+	sqliteDB, err := store.Open(config.DBPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
+		os.Exit(1)
+	}
+
+	metaStore := store.NewSqliteMetaStore(sqliteDB.DB)
+
+	err = tui.Run(apiClient, metaStore)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		os.Exit(1)

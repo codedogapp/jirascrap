@@ -1,7 +1,16 @@
 package model
 
+import (
+	"time"
+)
+
 type Ticket struct {
-	ID       string
-	Markdown string
-	Tags     []string
+	ID        string
+	Summary   string
+	Reporter  string
+	Status    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Markdown  string
+	Tags      []string
 }

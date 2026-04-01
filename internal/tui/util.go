@@ -7,6 +7,11 @@ type (
 	errMsg            struct{ err error }
 )
 
+type tagSavedMsg struct {
+	id   string
+	tags []string
+}
+
 func (e errMsg) Error() string {
 	return e.err.Error()
 }

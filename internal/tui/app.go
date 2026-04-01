@@ -2,40 +2,79 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/codedogapp/jirascrap/internal/jira"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/store"
 )
 
 type AppModel struct {
+	// Dependencies
 	jiraClient *jira.Client
-	tickets    []model.Ticket
-	cursor     int
-	selected   *model.Ticket
-	loading    bool
-	err        error
+	store      store.MetaStore
+
+	// Data
+	tickets  []model.Ticket
+	selected *model.Ticket
+
+	// TUI Elements
+	tagInput textinput.Model
+
+	// State
+	state   sessionState
+	cursor  int
+	loading bool
+	err     error
 }
 
-func NewApp(client *jira.Client) AppModel {
-	return AppModel{
+type sessionState int
+
+const (
+	listView sessionState = iota
+	detailView
+	taggingView
+)
+
+func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
+	ti := textinput.New()
+	ti.Placeholder = "tag1, tag2..."
+	ti.Focus()
+
+	return &AppModel{
 		jiraClient: client,
+		store:      s,
+		tagInput:   ti,
+		state:      listView,
 		loading:    true,
 	}
 }
 
-func (m AppModel) Init() tea.Cmd {
+func (m *AppModel) Init() tea.Cmd {
 	return func() tea.Msg {
 		tickets, err := m.jiraClient.FetchTickets()
 		if err != nil {
 			return errMsg{err}
 		}
+
+		localData, err := m.store.GetAllMeta()
+		if err != nil {
+			return errMsg{err}
+		}
+
+		for i, t := range tickets {
+			meta, exists := localData[t.ID]
+			if exists {
+				tickets[i].Tags = meta.Tags
+			}
+		}
+
 		return ticketsFetchedMsg(tickets)
 	}
 }
 
-func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ticketsFetchedMsg:
 		m.tickets = msg
@@ -47,35 +86,29 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		return m, nil
 
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+	case tagSavedMsg:
+		for i, t := range m.tickets {
+			if t.ID == msg.id {
+				m.tickets[i].Tags = msg.tags
+				if m.selected != nil && m.selected.ID == msg.id {
+					m.selected.Tags = msg.tags
+				}
 			}
-
-		case "down", "j":
-			if m.cursor < len(m.tickets)-1 {
-				m.cursor++
-			}
-
-		case "enter":
-			if len(m.tickets) > 0 {
-				m.selected = &m.tickets[m.cursor]
-			}
-
-		case "esc":
-			m.selected = nil
 		}
+		return m, nil
+
+	case tea.KeyMsg:
+		cmd := handleQuit(m, msg)
+		if cmd != nil {
+			return m, cmd
+		}
+		return m.getHandler().handleKey(m, msg)
 	}
 
 	return m, nil
 }
 
-func (m AppModel) View() string {
+func (m *AppModel) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("\nError: %v\n\nPress 'q' to quit.", m.err)
 	}
@@ -84,30 +117,33 @@ func (m AppModel) View() string {
 		return "\nFetching Tickets from Jira... \n"
 	}
 
-	if m.selected != nil {
-		return fmt.Sprintf("\nTicket: %s\n\n%s\n\nPress 'esc' to return, 'q' to quit.\n", m.selected.ID, m.selected.Markdown)
-	}
-
-	var b strings.Builder
-
-	b.WriteString("Your Jira Tickets:\n\n")
-
-	for i, ticket := range m.tickets {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-
-		fmt.Fprintf(&b, "%s %s\n", cursor, ticket.ID)
-	}
-
-	b.WriteString("\nPress j/k or up/down to move. Press Enter to select. Press 'q' to quit.\n")
-
-	return b.String()
+	return m.getHandler().view(m)
 }
 
-func Run(client *jira.Client) error {
-	app := NewApp(client)
+func (m *AppModel) getHandler() stateHandler {
+	switch m.state {
+	case detailView:
+		return detailHandler{}
+	case taggingView:
+		return taggingHandler{}
+	default:
+		return listHandler{}
+	}
+}
+
+func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.store.SaveMeta(id, tags, "")
+		if err != nil {
+			return errMsg{err}
+		}
+
+		return tagSavedMsg{id: id, tags: tags}
+	}
+}
+
+func Run(client *jira.Client, s store.MetaStore) error {
+	app := NewApp(client, s)
 	p := tea.NewProgram(app)
 	_, err := p.Run()
 	if err != nil {

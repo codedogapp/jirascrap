@@ -32,28 +32,6 @@ func NewClient(cfg *config.Config) *Client {
 	}
 }
 
-type searchRequest struct {
-	JQL        string   `json:"jql"`
-	MaxResults int      `json:"maxResults,omitempty"`
-	Expand     string   `json:"expand,omitempty"`
-	Fields     []string `json:"fields,omitempty"`
-}
-
-type searchResponse struct {
-	Issues []struct {
-		Key    string `json:"key"`
-		Fields struct {
-			Summary string `json:"summary"`
-			// TODO: other fields + json unmarshaller for time
-			CreatedAt time.Time `json:"created"`
-			UpdatedAt time.Time `json:"updated"`
-		} `json:"fields"`
-		RenderedFields struct {
-			Description string `json:"description"`
-		} `json:"renderedFields"`
-	}
-}
-
 func (c *Client) FetchTickets() ([]model.Ticket, error) {
 	url := fmt.Sprintf("%s/rest/api/3/search/jql", c.domain)
 	reqBody := searchRequest{
@@ -118,8 +96,13 @@ func (c *Client) FetchTickets() ([]model.Ticket, error) {
 		}
 
 		tickets = append(tickets, model.Ticket{
-			ID:       issue.Key,
-			Markdown: markdownDescription,
+			ID:        issue.Key,
+			Summary:   issue.Fields.Summary,
+			Reporter:  issue.Fields.Reporter.DisplayName,
+			Status:    issue.Fields.Status.Name,
+			CreatedAt: issue.Fields.CreatedAt.Time,
+			UpdatedAt: issue.Fields.UpdatedAt.Time,
+			Markdown:  markdownDescription,
 		})
 	}
 
