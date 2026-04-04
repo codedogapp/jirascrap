@@ -33,24 +33,10 @@ func handleQuit(m *AppModel, msg tea.KeyMsg) tea.Cmd {
 }
 
 func (h listHandler) handleKey(m *AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "j", "down":
-		m.cursor++
-		if m.cursor >= len(m.tickets) {
-			m.cursor = 0
-		}
-	case "k", "up":
-		m.cursor--
-		if m.cursor < 0 {
-			m.cursor = len(m.tickets) - 1
-		}
-	case "enter":
-		if len(m.tickets) > 0 {
-			m.selected = &m.tickets[m.cursor]
-			m.state = detailView
-		}
-	}
-	return m, nil
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+
+	return m, cmd
 }
 
 func (h taggingHandler) handleKey(m *AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -84,23 +70,9 @@ func (h detailHandler) handleKey(m *AppModel, msg tea.KeyMsg) (tea.Model, tea.Cm
 	return m, nil
 }
 
+// TODO: Empty stub
 func (h listHandler) view(m *AppModel) string {
-	var b strings.Builder
-
-	b.WriteString("Your Jira Tickets:\n\n")
-
-	for i, ticket := range m.tickets {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-
-		fmt.Fprintf(&b, "%s %s\n", cursor, ticket.ID)
-	}
-
-	b.WriteString("\nPress j/k or up/down to move. Press Enter to select. Press 'q' to quit.\n")
-
-	return b.String()
+	return ""
 }
 
 func (h detailHandler) view(m *AppModel) string {

@@ -3,17 +3,20 @@ package tui
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/codedogapp/jirascrap/internal/jira"
 	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/store"
+	tuimodels "github.com/codedogapp/jirascrap/internal/tui/models"
 )
 
 type AppModel struct {
 	// Dependencies
 	jiraClient *jira.Client
 	store      store.MetaStore
+	list       tuimodels.ListModel
 
 	// Data
 	tickets  []model.Ticket
@@ -45,6 +48,7 @@ func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
 	return &AppModel{
 		jiraClient: client,
 		store:      s,
+		list:       tuimodels.NewListModel([]model.Ticket{}),
 		tagInput:   ti,
 		state:      listView,
 		loading:    true,
@@ -77,6 +81,11 @@ func (m *AppModel) Init() tea.Cmd {
 func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ticketsFetchedMsg:
+		items := make([]list.Item, len(msg))
+		for i, t := range msg {
+			items[i] = tuimodels.TicketItem{Ticket: t}
+		}
+		m.list.SetItems(items)
 		m.tickets = msg
 		m.loading = false
 		return m, nil
@@ -85,6 +94,14 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg
 		m.loading = false
 		return m, nil
+
+	case tuimodels.SelectTicketMsg:
+		m.state = detailView
+		m.selected = &msg.Ticket
+		return m, nil
+
+	case tea.WindowSizeMsg:
+		m.list.SetSize(msg.Width, msg.Height)
 
 	case tagSavedMsg:
 		for i, t := range m.tickets {
@@ -115,6 +132,10 @@ func (m *AppModel) View() string {
 
 	if m.loading {
 		return "\nFetching Tickets from Jira... \n"
+	}
+
+	if m.state == listView {
+		return m.list.View()
 	}
 
 	return m.getHandler().view(m)

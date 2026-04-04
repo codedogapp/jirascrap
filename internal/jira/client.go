@@ -35,10 +35,8 @@ func NewClient(cfg *config.Config) *Client {
 func (c *Client) FetchTickets() ([]model.Ticket, error) {
 	url := fmt.Sprintf("%s/rest/api/3/search/jql", c.domain)
 	reqBody := searchRequest{
-		// TODO: Remove the limit once the TUI is ready
-		MaxResults: 5,
-		JQL:        c.jql,
-		Expand:     "renderedFields",
+		JQL:    c.jql,
+		Expand: "renderedFields",
 		Fields: []string{
 			"summary",
 			"status",
