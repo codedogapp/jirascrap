@@ -10,8 +10,6 @@ import (
 
 	"github.com/codedogapp/jirascrap/internal/config"
 	"github.com/codedogapp/jirascrap/internal/model"
-
-	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 )
 
 type Client struct {
@@ -35,8 +33,7 @@ func NewClient(cfg *config.Config) *Client {
 func (c *Client) FetchTickets() ([]model.Ticket, error) {
 	url := fmt.Sprintf("%s/rest/api/3/search/jql", c.domain)
 	reqBody := searchRequest{
-		JQL:    c.jql,
-		Expand: "renderedFields",
+		JQL: c.jql,
 		Fields: []string{
 			"summary",
 			"status",
@@ -82,25 +79,18 @@ func (c *Client) FetchTickets() ([]model.Ticket, error) {
 	var tickets []model.Ticket
 
 	for _, issue := range jiraResp.Issues {
-		var markdownDescription string
-		htmlDescription := issue.RenderedFields.Description
-		if htmlDescription != "" {
-			markdownDescription, err = md.ConvertString(htmlDescription)
-			if err != nil {
-				markdownDescription = "_Error converting description_"
-			}
-		} else {
-			markdownDescription = "_No description needed_"
-		}
+		markdownDescription := ADFToMarkdown(issue.Fields.Description)
 
 		tickets = append(tickets, model.Ticket{
-			ID:        issue.Key,
-			Summary:   issue.Fields.Summary,
-			Reporter:  issue.Fields.Reporter.DisplayName,
-			Status:    issue.Fields.Status.Name,
-			CreatedAt: issue.Fields.CreatedAt.Time,
-			UpdatedAt: issue.Fields.UpdatedAt.Time,
-			Markdown:  markdownDescription,
+			ID:             issue.Key,
+			Summary:        issue.Fields.Summary,
+			Reporter:       issue.Fields.Reporter.DisplayName,
+			Status:         issue.Fields.Status.Name,
+			StatusCategory: issue.Fields.Status.StatusCategory.Name,
+			Priority:       issue.Fields.Priority.Name,
+			CreatedAt:      issue.Fields.CreatedAt.Time,
+			UpdatedAt:      issue.Fields.UpdatedAt.Time,
+			Markdown:       markdownDescription,
 		})
 	}
 

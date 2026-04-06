@@ -27,6 +27,7 @@ func main() {
 
 	metaStore := store.NewSqliteMetaStore(sqliteDB.DB)
 
+	// TODO: define config file
 	err = tui.Run(apiClient, metaStore)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)

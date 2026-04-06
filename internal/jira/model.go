@@ -6,10 +6,9 @@ import (
 )
 
 type searchRequest struct {
-	JQL        string   `json:"jql"`
-	MaxResults int      `json:"maxResults,omitempty"`
-	Expand     string   `json:"expand,omitempty"`
-	Fields     []string `json:"fields,omitempty"`
+	JQL    string   `json:"jql"`
+	Expand string   `json:"expand,omitempty"`
+	Fields []string `json:"fields,omitempty"`
 }
 
 type searchResponse struct {
@@ -17,21 +16,26 @@ type searchResponse struct {
 }
 
 type issue struct {
-	Key            string         `json:"key"`
-	Fields         issueField     `json:"fields"`
-	RenderedFields renderedFields `json:"renderedFields"`
+	Key    string     `json:"key"`
+	Fields issueField `json:"fields"`
 }
 
-type renderedFields struct {
-	Description string `json:"description"`
+type statusCategory struct {
+	Name string `json:"name"`
+}
+
+type priority struct {
+	Name string `json:"name"`
 }
 
 type issueField struct {
-	Summary   string   `json:"summary"`
-	Reporter  reporter `json:"reporter"`
-	Status    status   `json:"status"`
-	CreatedAt jiraTime `json:"created"`
-	UpdatedAt jiraTime `json:"updated"`
+	Summary     string   `json:"summary"`
+	Description any      `json:"description"`
+	Reporter    reporter `json:"reporter"`
+	Status      status   `json:"status"`
+	Priority    priority `json:"priority"`
+	CreatedAt   jiraTime `json:"created"`
+	UpdatedAt   jiraTime `json:"updated"`
 }
 
 type reporter struct {
@@ -39,7 +43,8 @@ type reporter struct {
 }
 
 type status struct {
-	Name string `json:"name"`
+	Name           string         `json:"name"`
+	StatusCategory statusCategory `json:"statusCategory"`
 }
 
 const jiraTimeLayout = "2006-01-02T15:04:05.000-0700"

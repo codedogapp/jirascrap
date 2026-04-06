@@ -3,164 +3,139 @@ package tui
 import (
 	"fmt"
 
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/jira"
 	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/store"
-	tuimodels "github.com/codedogapp/jirascrap/internal/tui/models"
+	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+// TODO: define global styling
+// TODO: define key bindings
 type AppModel struct {
 	// Dependencies
 	jiraClient *jira.Client
 	store      store.MetaStore
-	list       tuimodels.ListModel
-
-	// Data
-	tickets  []model.Ticket
-	selected *model.Ticket
-
-	// TUI Elements
-	tagInput textinput.Model
 
 	// State
-	state   sessionState
-	cursor  int
-	loading bool
-	err     error
+	list        *views.ListModel
+	activeModel views.ActiveModel
+	debugModel  *views.DebugModel
+	err         error
+
+	// Size
+	width  int
+	height int
 }
 
-type sessionState int
-
-const (
-	listView sessionState = iota
-	detailView
-	taggingView
-)
-
 func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
-	ti := textinput.New()
-	ti.Placeholder = "tag1, tag2..."
-	ti.Focus()
-
+	listModel := views.NewListModel([]model.Ticket{})
+	debugModel := views.NewDebugModel(0, 0)
 	return &AppModel{
-		jiraClient: client,
-		store:      s,
-		list:       tuimodels.NewListModel([]model.Ticket{}),
-		tagInput:   ti,
-		state:      listView,
-		loading:    true,
+		jiraClient:  client,
+		store:       s,
+		list:        listModel,
+		activeModel: listModel,
+		debugModel:  debugModel,
 	}
 }
 
 func (m *AppModel) Init() tea.Cmd {
-	return func() tea.Msg {
-		tickets, err := m.jiraClient.FetchTickets()
-		if err != nil {
-			return errMsg{err}
-		}
-
-		localData, err := m.store.GetAllMeta()
-		if err != nil {
-			return errMsg{err}
-		}
-
-		for i, t := range tickets {
-			meta, exists := localData[t.ID]
-			if exists {
-				tickets[i].Tags = meta.Tags
+	return tea.Batch(
+		m.list.StartSpinner(),
+		func() tea.Msg {
+			tickets, err := m.jiraClient.FetchTickets()
+			if err != nil {
+				return views.ErrMsg{Err: err}
 			}
-		}
 
-		return ticketsFetchedMsg(tickets)
-	}
+			localData, err := m.store.GetAllMeta()
+			if err != nil {
+				return views.ErrMsg{Err: err}
+			}
+
+			for i, t := range tickets {
+				meta, exists := localData[t.ID]
+				if exists {
+					tickets[i].Tags = meta.Tags
+				}
+			}
+
+			return ticketsFetchedMsg(tickets)
+		},
+	)
 }
 
 func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case ticketsFetchedMsg:
-		items := make([]list.Item, len(msg))
-		for i, t := range msg {
-			items[i] = tuimodels.TicketItem{Ticket: t}
-		}
-		m.list.SetItems(items)
-		m.tickets = msg
-		m.loading = false
-		return m, nil
-
-	case errMsg:
-		m.err = msg
-		m.loading = false
-		return m, nil
-
-	case tuimodels.SelectTicketMsg:
-		m.state = detailView
-		m.selected = &msg.Ticket
-		return m, nil
 
 	case tea.WindowSizeMsg:
-		m.list.SetSize(msg.Width, msg.Height)
+		return m.handleWindowSize(msg)
+
+	case ticketsFetchedMsg:
+		return m.handleTicketsFetched(msg)
+
+	case views.ErrMsg:
+		return m.handleError(msg)
+
+	case views.SelectTicketMsg:
+		return m.handleSelectTicket(msg)
+
+	case views.GoToListMsg:
+		return m.handleGoToList(msg)
+
+	case views.TaggingMsg:
+		return m.handleTaggingMsg(msg)
+
+	case views.TagsCancelledMsg:
+		return m.handleTagsCancelled(msg)
+
+	case views.TagsFilledMsg:
+		return m.handleTagFilled(msg)
 
 	case tagSavedMsg:
-		for i, t := range m.tickets {
-			if t.ID == msg.id {
-				m.tickets[i].Tags = msg.tags
-				if m.selected != nil && m.selected.ID == msg.id {
-					m.selected.Tags = msg.tags
-				}
-			}
-		}
-		return m, nil
+		return m.handleTagSaved(msg)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		cmd := handleQuit(m, msg)
 		if cmd != nil {
 			return m, cmd
 		}
-		return m.getHandler().handleKey(m, msg)
+		if consumed, cmd := handleDebug(m, msg); consumed {
+			return m, cmd
+		}
+		m.activeModel, cmd = m.activeModel.Update(msg)
+		return m, cmd
+
+	default:
+		if mu, ok := m.activeModel.(views.MsgUpdater); ok {
+			return m, mu.UpdateMsg(msg)
+		}
 	}
 
 	return m, nil
 }
 
-func (m *AppModel) View() string {
+func (m *AppModel) View() tea.View {
 	if m.err != nil {
-		return fmt.Sprintf("\nError: %v\n\nPress 'q' to quit.", m.err)
+		return tea.NewView(fmt.Sprintf("\nError: %v\n\nPress 'q' to quit.", m.err))
 	}
 
-	if m.loading {
-		return "\nFetching Tickets from Jira... \n"
+	base := m.activeModel.View()
+
+	debug := m.debugModel.View()
+
+	if debug != nil {
+		return tea.NewView(
+			lipgloss.NewCompositor(
+				lipgloss.NewLayer(base.Content),
+				debug,
+			).Render(),
+		)
 	}
 
-	if m.state == listView {
-		return m.list.View()
-	}
-
-	return m.getHandler().view(m)
-}
-
-func (m *AppModel) getHandler() stateHandler {
-	switch m.state {
-	case detailView:
-		return detailHandler{}
-	case taggingView:
-		return taggingHandler{}
-	default:
-		return listHandler{}
-	}
-}
-
-func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
-	return func() tea.Msg {
-		err := m.store.SaveMeta(id, tags, "")
-		if err != nil {
-			return errMsg{err}
-		}
-
-		return tagSavedMsg{id: id, tags: tags}
-	}
+	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(base.Content))
 }
 
 func Run(client *jira.Client, s store.MetaStore) error {

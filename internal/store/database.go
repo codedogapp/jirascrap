@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 
+	"github.com/codedogapp/jirascrap/internal/logger"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 )
@@ -27,6 +28,7 @@ func Open(dbPath string) (*DB, error) {
 	goose.SetBaseFS(embedMigrations)
 
 	err = goose.SetDialect(SQLDriver)
+	goose.SetLogger(logger.GooseLoggerAdapter{})
 	if err != nil {
 		return nil, fmt.Errorf("db: failed to set dialect: %w", err)
 	}
