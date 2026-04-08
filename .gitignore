@@ -17,3 +17,6 @@ go.work
 
 # mise local
 mise.local.toml
+
+# db
+data/
