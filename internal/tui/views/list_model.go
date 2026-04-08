@@ -15,6 +15,7 @@ import (
 type ListModel struct {
 	list    list.Model
 	tickets []model.Ticket
+	style   lipgloss.Style
 }
 
 type TicketItem struct {
@@ -29,7 +30,7 @@ type ticketDelegate struct {
 	list.DefaultDelegate
 }
 
-func NewListModel(tickets []model.Ticket) *ListModel {
+func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 	items := getItemsList(tickets)
 
 	l := list.New(
@@ -51,6 +52,7 @@ func NewListModel(tickets []model.Ticket) *ListModel {
 	return &ListModel{
 		list:    l,
 		tickets: tickets,
+		style:   style,
 	}
 }
 
@@ -59,11 +61,18 @@ func (m *ListModel) StartSpinner() tea.Cmd {
 }
 
 func (m *ListModel) SetSize(width int, height int) {
-	m.list.SetSize(width-4, height-2)
+	w, h := m.style.GetFrameSize()
+	m.list.SetSize(width-w, height-h)
 }
 
 func (i TicketItem) FilterValue() string {
-	return i.Ticket.ID + " " + i.Ticket.Summary + " " + i.Ticket.Priority + " " + i.Ticket.Status
+	return i.Ticket.ID +
+		" " +
+		i.Ticket.Summary +
+		" " +
+		i.Ticket.Priority +
+		" " +
+		i.Ticket.Status
 }
 
 func (m *ListModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {

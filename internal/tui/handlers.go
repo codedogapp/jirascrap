@@ -5,6 +5,29 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+func (m *AppModel) fetchTickets() tea.Cmd {
+	return func() tea.Msg {
+		tickets, err := m.jiraClient.FetchTickets()
+		if err != nil {
+			return views.ErrMsg{Err: err}
+		}
+
+		localData, err := m.store.GetAllMeta()
+		if err != nil {
+			return views.ErrMsg{Err: err}
+		}
+
+		for i, t := range tickets {
+			meta, exists := localData[t.ID]
+			if exists {
+				tickets[i].Tags = meta.Tags
+			}
+		}
+
+		return ticketsFetchedMsg(tickets)
+	}
+}
+
 func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.list.SetSize(msg.Width, msg.Height)
 	m.debugModel.SetSize(msg.Width, msg.Height)
@@ -27,7 +50,7 @@ func (m *AppModel) handleError(msg views.ErrMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea.Cmd) {
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height)
+	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
 	return m, nil
 }
 
@@ -42,7 +65,7 @@ func (m *AppModel) handleTaggingMsg(msg views.TaggingMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleTagsCancelled(msg views.TagsCancelledMsg) (tea.Model, tea.Cmd) {
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height)
+	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
 	return m, nil
 }
 

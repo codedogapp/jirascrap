@@ -11,8 +11,8 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
-// TODO: define global styling
 // TODO: define key bindings
+
 type AppModel struct {
 	// Dependencies
 	jiraClient *jira.Client
@@ -24,13 +24,14 @@ type AppModel struct {
 	debugModel  *views.DebugModel
 	err         error
 
-	// Size
+	styles views.Styles
 	width  int
 	height int
 }
 
 func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
-	listModel := views.NewListModel([]model.Ticket{})
+	styles := views.NewStyles()
+	listModel := views.NewListModel([]model.Ticket{}, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
 	return &AppModel{
 		jiraClient:  client,
@@ -38,32 +39,14 @@ func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
 		list:        listModel,
 		activeModel: listModel,
 		debugModel:  debugModel,
+		styles:      styles,
 	}
 }
 
 func (m *AppModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.list.StartSpinner(),
-		func() tea.Msg {
-			tickets, err := m.jiraClient.FetchTickets()
-			if err != nil {
-				return views.ErrMsg{Err: err}
-			}
-
-			localData, err := m.store.GetAllMeta()
-			if err != nil {
-				return views.ErrMsg{Err: err}
-			}
-
-			for i, t := range tickets {
-				meta, exists := localData[t.ID]
-				if exists {
-					tickets[i].Tags = meta.Tags
-				}
-			}
-
-			return ticketsFetchedMsg(tickets)
-		},
+		m.fetchTickets(),
 	)
 }
 
@@ -135,7 +118,7 @@ func (m *AppModel) View() tea.View {
 		)
 	}
 
-	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(base.Content))
+	return tea.NewView(m.styles.App.Render(base.Content))
 }
 
 func Run(client *jira.Client, s store.MetaStore) error {

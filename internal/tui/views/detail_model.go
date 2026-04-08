@@ -14,6 +14,7 @@ import (
 type DetailModel struct {
 	ticket   model.Ticket
 	viewport viewport.Model
+	style    Styles
 }
 
 type (
@@ -23,16 +24,23 @@ type (
 	}
 )
 
-func NewDetailModel(ticket model.Ticket, width int, height int) ActiveModel {
-	footerHeight := 2
-	vp := viewport.New(viewport.WithWidth(width-2), viewport.WithHeight(height-footerHeight-1))
+func NewDetailModel(ticket model.Ticket, width int, height int, style Styles) ActiveModel {
+	w, h := style.App.GetFrameSize()
 
-	markdown := getContent(ticket)
-	renderer, _ := glamour.NewTermRenderer(glamour.WithStandardStyle("dracula"), glamour.WithWordWrap(width-4))
-	rendered, _ := renderer.Render(markdown)
+	vp := viewport.New(
+		viewport.WithWidth(width-w),
+		viewport.WithHeight(height-(h*2)),
+	)
 
-	vp.SetContent(getHeader(ticket, width-4) + rendered)
-	return &DetailModel{ticket: ticket, viewport: vp}
+	markdown := getContent(ticket, width-w)
+
+	vp.SetContent(getMetaData(ticket, width-w) + markdown)
+
+	return &DetailModel{
+		ticket:   ticket,
+		viewport: vp,
+		style:    style,
+	}
 }
 
 func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
@@ -52,30 +60,47 @@ func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 	}
 }
 
-func getHeader(ticket model.Ticket, width int) string {
+func getMetaData(ticket model.Ticket, width int) string {
 	var sb strings.Builder
 
 	title := titleStyle.Render(ticket.ID) + ticket.Summary
 	sb.WriteString(title + "\n\n")
 
-	// Status / priority
-	statusC := statusColor(ticket.StatusCategory)
-	priorityC := priorityColor(ticket.Priority)
-	sb.WriteString(lipgloss.NewStyle().Foreground(statusC).Bold(true).Padding(0, 2).Render("● " + ticket.Status))
-	if ticket.Priority != "" {
-		sb.WriteString("  ")
-		sb.WriteString(lipgloss.NewStyle().Foreground(priorityC).Render("▲ " + ticket.Priority))
-	}
+	styleStatus(ticket.StatusCategory, ticket.Status, &sb)
+	stylePriority(ticket.Priority, &sb)
+
 	sb.WriteString("\n")
 
 	if ticket.Reporter != "" {
-		sb.WriteString(dimStyle.Render("Reporter: ") + ticket.Reporter + "\n")
+		sb.WriteString(
+			dimStyle.Render("Reporter: ") + ticket.Reporter + "\n",
+		)
 	}
-	sb.WriteString(dimStyle.Render(fmt.Sprintf("Updated:  %s", ticket.UpdatedAt.Format("2006-01-02 15:04"))) + "\n")
-	sb.WriteString(dimStyle.Render(fmt.Sprintf("Created:  %s", ticket.CreatedAt.Format("2006-01-02 15:04"))) + "\n")
+
+	sb.WriteString(
+		dimStyle.Render(
+			fmt.Sprintf(
+				"Updated:  %s",
+				ticket.UpdatedAt.Format("2006-01-02 15:04"),
+			),
+		),
+	)
+
+	sb.WriteString("\n")
+
+	sb.WriteString(
+		dimStyle.Render(
+			fmt.Sprintf(
+				"Created:  %s",
+				ticket.CreatedAt.Format("2006-01-02 15:04"),
+			),
+		),
+	)
+
+	sb.WriteString("\n")
+	sb.WriteString("\n")
 
 	// Tags
-	sb.WriteString("\n")
 	if len(ticket.Tags) > 0 {
 		sb.WriteString(dimStyle.Render("Tags: "))
 		for _, t := range ticket.Tags {
@@ -83,20 +108,34 @@ func getHeader(ticket model.Ticket, width int) string {
 		}
 		sb.WriteString("\n")
 	} else {
-		sb.WriteString(dimStyle.Render("Tags: —") + "\n")
+		sb.WriteString(dimStyle.Render("Tags: —"))
+		sb.WriteString("\n")
 	}
 
-	sb.WriteString(dimStyle.Render(strings.Repeat("─", width-4)) + "\n")
+	sb.WriteString(
+		dimStyle.Render(
+			strings.Repeat("─", width-4),
+		),
+	)
 
-	return "\n" + sb.String()
+	sb.WriteString("\n\n")
+
+	return sb.String()
 }
 
 func (m *DetailModel) View() tea.View {
 	return tea.NewView(m.viewport.View() + "\n" + getFooter())
 }
 
-func getContent(ticket model.Ticket) string {
-	return ticket.Markdown
+func getContent(ticket model.Ticket, width int) string {
+	renderer, _ := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dracula"),
+		glamour.WithWordWrap(width),
+	)
+
+	rendered, _ := renderer.Render(ticket.Markdown)
+
+	return rendered
 }
 
 func getFooter() string {
