@@ -105,20 +105,20 @@ func (m *AppModel) View() tea.View {
 		return tea.NewView(fmt.Sprintf("\nError: %v\n\nPress 'q' to quit.", m.err))
 	}
 
-	base := m.activeModel.View()
+	base := m.styles.App.Render(m.activeModel.View().Content)
 
 	debug := m.debugModel.View()
 
 	if debug != nil {
 		return tea.NewView(
 			lipgloss.NewCompositor(
-				lipgloss.NewLayer(base.Content),
+				lipgloss.NewLayer(base),
 				debug,
 			).Render(),
 		)
 	}
 
-	return tea.NewView(m.styles.App.Render(base.Content))
+	return tea.NewView(base)
 }
 
 func Run(client *jira.Client, s store.MetaStore) error {
