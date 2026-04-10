@@ -60,8 +60,9 @@ func (m *AppModel) handleGoToList(_ views.GoToListMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleTaggingMsg(msg views.TaggingMsg) (tea.Model, tea.Cmd) {
-	m.activeModel = views.NewTagModel(msg.Ticket)
-	return m, nil
+	var cmd tea.Cmd
+	m.activeModel, cmd = views.NewTagModel(msg.Ticket, m.width)
+	return m, cmd
 }
 
 func (m *AppModel) handleTagsCancelled(msg views.TagsCancelledMsg) (tea.Model, tea.Cmd) {

@@ -24,15 +24,16 @@ type (
 	}
 )
 
-func NewTagModel(ticket model.Ticket) *TagModel {
+func NewTagModel(ticket model.Ticket, width int) (*TagModel, tea.Cmd) {
 	ti := textinput.New()
 	ti.Placeholder = "tag1, tag2, ..."
+	ti.SetWidth(width)
 	ti.SetValue(strings.Join(ticket.Tags, ", "))
-	ti.Focus()
+	cmd := ti.Focus()
 	return &TagModel{
 		tagInput: ti,
 		ticket:   ticket,
-	}
+	}, cmd
 }
 
 func (m *TagModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
@@ -44,10 +45,7 @@ func (m *TagModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 			}
 		}
 	case "enter":
-		tags := strings.Split(m.tagInput.Value(), ",")
-		for i, tag := range tags {
-			tags[i] = strings.TrimSpace(tag)
-		}
+		tags := trimTags(m.tagInput.Value())
 		return m, func() tea.Msg {
 			return TagsFilledMsg{
 				ID:   m.ticket.ID,
@@ -59,6 +57,24 @@ func (m *TagModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 	var cmd tea.Cmd
 	m.tagInput, cmd = m.tagInput.Update(msg)
 	return m, cmd
+}
+
+func trimTags(tags string) []string {
+	splitTags := strings.Split(tags, ",")
+	var trimmedTags []string
+	for _, tag := range splitTags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed != "" {
+			trimmedTags = append(trimmedTags, trimmed)
+		}
+	}
+	return trimmedTags
+}
+
+func (m *TagModel) UpdateMsg(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	m.tagInput, cmd = m.tagInput.Update(msg)
+	return cmd
 }
 
 func (m *TagModel) View() tea.View {

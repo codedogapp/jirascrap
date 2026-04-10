@@ -72,7 +72,9 @@ func (i TicketItem) FilterValue() string {
 		" " +
 		i.Ticket.Priority +
 		" " +
-		i.Ticket.Status
+		i.Ticket.Status +
+		" " +
+		strings.Join(i.Ticket.Tags, " ")
 }
 
 func (m *ListModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
@@ -178,6 +180,17 @@ func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 	}
 
 	sb.WriteString(i.Ticket.ID)
+
+	if len(i.Ticket.Tags) > 0 {
+		sb.WriteString(" | ")
+		for _, t := range i.Ticket.Tags {
+			sb.WriteString(
+				lipgloss.NewStyle().
+					Foreground(colSecondary).
+					Render("#" + t + " "),
+			)
+		}
+	}
 
 	titleStyle := d.Styles.NormalTitle
 	descStyle := d.Styles.NormalDesc
