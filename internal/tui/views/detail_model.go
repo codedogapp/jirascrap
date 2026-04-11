@@ -4,17 +4,21 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 )
 
 type DetailModel struct {
-	ticket   model.Ticket
-	viewport viewport.Model
-	style    Styles
+	ticket          model.Ticket
+	viewport        viewport.Model
+	help            help.Model
+	availableHeight int
 }
 
 type (
@@ -24,35 +28,62 @@ type (
 	}
 )
 
-func NewDetailModel(ticket model.Ticket, width int, height int, style Styles) ActiveModel {
+const (
+	footerHeight     = 2
+	separatorPadding = 4
+)
+
+func NewDetailModel(
+	ticket model.Ticket,
+	width int,
+	height int,
+	style Styles,
+) ActiveModel {
 	w, h := style.App.GetFrameSize()
+
+	availableHeight := height - h - footerHeight
 
 	vp := viewport.New(
 		viewport.WithWidth(width-w),
-		viewport.WithHeight(height-(h*2)),
+		viewport.WithHeight(availableHeight),
 	)
 
 	markdown := getContent(ticket, width-w)
 
 	vp.SetContent(getMetaData(ticket, width-w) + markdown)
 
+	help := help.New()
+	help.SetWidth(width - w)
+
 	return &DetailModel{
-		ticket:   ticket,
-		viewport: vp,
-		style:    style,
+		ticket:          ticket,
+		viewport:        vp,
+		help:            help,
+		availableHeight: availableHeight,
 	}
 }
 
 func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	switch {
+	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
 		return m, func() tea.Msg {
 			return GoToListMsg{}
 		}
-	case "t":
+
+	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTagging):
 		return m, func() tea.Msg {
 			return TaggingMsg{Ticket: m.ticket}
 		}
+
+	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleHelp):
+		m.help.ShowAll = !m.help.ShowAll
+		if m.help.ShowAll {
+			m.viewport.SetHeight(m.availableHeight - keymaps.DefaultKeyMap.GetFullHelpHeight())
+		} else {
+			m.viewport.SetHeight(m.availableHeight)
+		}
+		return m, nil
+
 	default:
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
@@ -114,7 +145,7 @@ func getMetaData(ticket model.Ticket, width int) string {
 
 	sb.WriteString(
 		dimStyle.Render(
-			strings.Repeat("─", width-4),
+			strings.Repeat("─", width-separatorPadding),
 		),
 	)
 
@@ -124,7 +155,8 @@ func getMetaData(ticket model.Ticket, width int) string {
 }
 
 func (m *DetailModel) View() tea.View {
-	return tea.NewView(m.viewport.View() + "\n" + getFooter())
+	helpView := styleHelp(m.help.View(keymaps.DefaultKeyMap))
+	return tea.NewView(m.viewport.View() + "\n" + helpView)
 }
 
 func getContent(ticket model.Ticket, width int) string {
@@ -138,32 +170,33 @@ func getContent(ticket model.Ticket, width int) string {
 	return rendered
 }
 
-func getFooter() string {
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#4A4A4A"))
-	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3C3C3C"))
+// STYLES
+func styleStatus(statusCategory string, status string, sb *strings.Builder) {
+	statusC := statusColor(statusCategory)
+	rendered := lipgloss.NewStyle().
+		Bold(true).
+		Padding(0, 2).
+		Foreground(statusC).
+		Render("● " + status)
 
-	var sb strings.Builder
+	sb.WriteString(rendered)
+}
 
-	separator := " • "
+func stylePriority(priority string, sb *strings.Builder) {
+	priorityC := priorityColor(priority)
+	if priority != "" {
+		sb.WriteString("  ")
+		sb.WriteString(
+			lipgloss.NewStyle().
+				Foreground(priorityC).
+				Render("▲ " + priority),
+		)
+	}
+}
 
-	sb.WriteString(keyStyle.Render("↑/↓ "))
-	sb.WriteString(descStyle.Render("scroll"))
-	sb.WriteString(sepStyle.Render(separator))
-
-	sb.WriteString(keyStyle.Render("esc "))
-	sb.WriteString(descStyle.Render("back"))
-	sb.WriteString(sepStyle.Render(separator))
-
-	sb.WriteString(keyStyle.Render("t "))
-	sb.WriteString(descStyle.Render("tag"))
-	sb.WriteString(sepStyle.Render(separator))
-
-	sb.WriteString(keyStyle.Render("q "))
-	sb.WriteString(descStyle.Render("quit"))
-
+func styleHelp(help string) string {
 	return lipgloss.NewStyle().
-		MarginLeft(2).
 		MarginTop(1).
-		Render(sb.String())
+		MarginLeft(2).
+		Render(help)
 }

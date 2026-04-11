@@ -14,5 +14,8 @@ type MsgUpdater interface {
 type ErrMsg struct{ Err error }
 
 func (e ErrMsg) Error() string {
+	if e.Err == nil {
+		return "unknown error"
+	}
 	return e.Err.Error()
 }

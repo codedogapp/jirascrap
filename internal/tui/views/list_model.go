@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 )
 
 type ListModel struct {
@@ -42,10 +43,8 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 	l.Title = "Jira Tickets"
 	l.AdditionalFullHelpKeys = func() []key.Binding {
 		return []key.Binding{
-			key.NewBinding(
-				key.WithKeys("d"),
-				key.WithHelp("d", "debug view"),
-			),
+			keymaps.DefaultKeyMap.ToggleDebug,
+			keymaps.DefaultKeyMap.Select,
 		}
 	}
 
@@ -78,7 +77,8 @@ func (i TicketItem) FilterValue() string {
 }
 
 func (m *ListModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
-	if msg.String() == "enter" && m.list.FilterState() != list.Filtering {
+	if key.Matches(msg, keymaps.DefaultKeyMap.Select) &&
+		m.list.FilterState() != list.Filtering {
 		if i, ok := m.list.SelectedItem().(TicketItem); ok {
 			return m, func() tea.Msg {
 				return SelectTicketMsg(i)
@@ -165,32 +165,12 @@ func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 
 	var sb strings.Builder
 
-	sb.WriteString(
-		lipgloss.NewStyle().
-			Foreground(statusColor(i.Ticket.StatusCategory)).
-			Render("● "),
-	)
-
-	if i.Ticket.Priority != "" {
-		sb.WriteString(
-			lipgloss.NewStyle().
-				Foreground(priorityColor(i.Ticket.Priority)).
-				Render("▲ "),
-		)
-	}
+	styleStatusDot(i.Ticket.StatusCategory, &sb)
+	stylePriorityDot(i.Ticket.Priority, &sb)
 
 	sb.WriteString(i.Ticket.ID)
 
-	if len(i.Ticket.Tags) > 0 {
-		sb.WriteString(" | ")
-		for _, t := range i.Ticket.Tags {
-			sb.WriteString(
-				lipgloss.NewStyle().
-					Foreground(colSecondary).
-					Render("#" + t + " "),
-			)
-		}
-	}
+	styleTags(i.Ticket.Tags, &sb)
 
 	titleStyle := d.Styles.NormalTitle
 	descStyle := d.Styles.NormalDesc
@@ -205,4 +185,41 @@ func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 		titleStyle.Render(sb.String()),
 		descStyle.Render(i.Ticket.Summary),
 	)
+}
+
+// STYLES
+func styleStatusDot(statusCategory string, sb *strings.Builder) {
+	statusC := statusColor(statusCategory)
+	rendered := lipgloss.NewStyle().
+		Foreground(statusC).
+		Render("● ")
+
+	sb.WriteString(rendered)
+}
+
+func stylePriorityDot(priority string, sb *strings.Builder) {
+	if priority == "" {
+		return
+	}
+	priorityC := priorityColor(priority)
+	rendered := lipgloss.NewStyle().
+		Foreground(priorityC).
+		Render("▲ ")
+
+	sb.WriteString(rendered)
+}
+
+var tagsStyle = lipgloss.NewStyle().
+	Foreground(colSecondary)
+
+func styleTags(tags []string, sb *strings.Builder) {
+	if len(tags) > 0 {
+		sb.WriteString(" | ")
+		for _, t := range tags {
+			sb.WriteString(
+				tagsStyle.
+					Render("#" + t + " "),
+			)
+		}
+	}
 }

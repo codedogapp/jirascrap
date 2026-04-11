@@ -27,8 +27,12 @@ func NewDebugModel(width int, height int) *DebugModel {
 	modelWidth := width / RatioWidth
 	modelHeight := height / RatioHeight
 
-	vp := viewport.New(viewport.WithWidth(modelWidth), viewport.WithHeight(modelHeight))
+	vp := viewport.New(
+		viewport.WithWidth(modelWidth),
+		viewport.WithHeight(modelHeight),
+	)
 	vp.SetContent("")
+
 	return &DebugModel{
 		visible:        false,
 		viewport:       vp,
@@ -48,6 +52,7 @@ func (m *DebugModel) View() *lipgloss.Layer {
 	if !m.visible {
 		return nil
 	}
+
 	debugView := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderTop(false).
@@ -89,9 +94,17 @@ func formatLogs() string {
 	var sb strings.Builder
 	entries := logger.Log.Logs()
 	for i, entry := range entries {
-		log := fmt.Sprintf("[%s] %s", entry.Level.String(), entry.Message)
-		styledLog := lipgloss.NewStyle().Foreground(getColor(entry.Level)).Render(log)
+		log := fmt.Sprintf(
+			"[%s] %s",
+			entry.Level.String(),
+			entry.Message,
+		)
+
+		styledLog := lipgloss.NewStyle().
+			Foreground(getColor(entry.Level)).
+			Render(log)
 		sb.WriteString(styledLog)
+
 		if i != len(entries)-1 {
 			sb.WriteString("\n")
 		}
