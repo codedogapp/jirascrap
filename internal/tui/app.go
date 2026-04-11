@@ -68,12 +68,6 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case views.GoToListMsg:
 		return m.handleGoToList(msg)
 
-	case views.TaggingMsg:
-		return m.handleTaggingMsg(msg)
-
-	case views.TagsCancelledMsg:
-		return m.handleTagsCancelled(msg)
-
 	case views.TagsFilledMsg:
 		return m.handleTagFilled(msg)
 

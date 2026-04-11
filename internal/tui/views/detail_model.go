@@ -19,14 +19,10 @@ type DetailModel struct {
 	viewport        viewport.Model
 	help            help.Model
 	availableHeight int
+	tagModel        *TagModel
 }
 
-type (
-	GoToListMsg struct{}
-	TaggingMsg  struct {
-		Ticket model.Ticket
-	}
-)
+type GoToListMsg struct{}
 
 const (
 	footerHeight     = 2
@@ -38,32 +34,54 @@ func NewDetailModel(
 	width int,
 	height int,
 	style Styles,
+	allTags []string,
 ) ActiveModel {
 	w, h := style.App.GetFrameSize()
 
 	availableHeight := height - h - footerHeight
+	contentWidth := width - w
 
 	vp := viewport.New(
-		viewport.WithWidth(width-w),
+		viewport.WithWidth(contentWidth),
 		viewport.WithHeight(availableHeight),
 	)
 
-	markdown := getContent(ticket, width-w)
+	markdown := getContent(ticket, contentWidth)
 
-	vp.SetContent(getMetaData(ticket, width-w) + markdown)
+	vp.SetContent(getMetaData(ticket, contentWidth) + markdown)
 
 	help := help.New()
-	help.SetWidth(width - w)
+	help.SetWidth(contentWidth)
 
 	return &DetailModel{
 		ticket:          ticket,
 		viewport:        vp,
 		help:            help,
 		availableHeight: availableHeight,
+		tagModel:        NewTagModel(contentWidth, availableHeight, allTags),
 	}
 }
 
 func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
+	if m.tagModel.IsVisible() {
+		switch {
+		case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
+			m.tagModel.Hide()
+			return m, nil
+
+		case key.Matches(msg, keymaps.DefaultKeyMap.Select):
+			id := m.tagModel.TicketID()
+			tags := m.tagModel.CurrentTags()
+			m.tagModel.Hide()
+			return m, func() tea.Msg {
+				return TagsFilledMsg{ID: id, Tags: tags}
+			}
+
+		default:
+			return m, m.tagModel.Update(msg)
+		}
+	}
+
 	switch {
 	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
 		return m, func() tea.Msg {
@@ -71,9 +89,7 @@ func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 		}
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTagging):
-		return m, func() tea.Msg {
-			return TaggingMsg{Ticket: m.ticket}
-		}
+		return m, m.tagModel.Show(m.ticket)
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleHelp):
 		m.help.ShowAll = !m.help.ShowAll
@@ -154,9 +170,31 @@ func getMetaData(ticket model.Ticket, width int) string {
 	return sb.String()
 }
 
+func (m *DetailModel) IsTagging() bool {
+	return m.tagModel.IsVisible()
+}
+
+func (m *DetailModel) UpdateMsg(msg tea.Msg) tea.Cmd {
+	if m.tagModel.IsVisible() {
+		return m.tagModel.UpdateMsg(msg)
+	}
+	return nil
+}
+
 func (m *DetailModel) View() tea.View {
 	helpView := styleHelp(m.help.View(keymaps.DefaultKeyMap))
-	return tea.NewView(m.viewport.View() + "\n" + helpView)
+	base := m.viewport.View() + "\n" + helpView
+
+	if overlay := m.tagModel.View(); overlay != nil {
+		return tea.NewView(
+			lipgloss.NewCompositor(
+				lipgloss.NewLayer(base),
+				overlay,
+			).Render(),
+		)
+	}
+
+	return tea.NewView(base)
 }
 
 func getContent(ticket model.Ticket, width int) string {

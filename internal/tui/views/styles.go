@@ -49,6 +49,19 @@ var (
 			Foreground(lipgloss.White).
 			Padding(0, 2).
 			MarginRight(1)
+
+	popUpTitle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colSecondary)
+
+	tagViewPopUp = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderTop(false).
+			BorderForeground(colSecondary).
+			Padding(0, 1)
+
+	topBorder = lipgloss.NewStyle().
+			Foreground(colSecondary)
 )
 
 func statusColor(status string) color.Color {

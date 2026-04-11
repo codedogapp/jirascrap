@@ -50,23 +50,12 @@ func (m *AppModel) handleError(msg views.ErrMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea.Cmd) {
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
+	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles, m.list.AllTags())
 	return m, nil
 }
 
 func (m *AppModel) handleGoToList(_ views.GoToListMsg) (tea.Model, tea.Cmd) {
 	m.activeModel = m.list
-	return m, nil
-}
-
-func (m *AppModel) handleTaggingMsg(msg views.TaggingMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.activeModel, cmd = views.NewTagModel(msg.Ticket, m.width)
-	return m, cmd
-}
-
-func (m *AppModel) handleTagsCancelled(msg views.TagsCancelledMsg) (tea.Model, tea.Cmd) {
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
 	return m, nil
 }
 
@@ -125,8 +114,10 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 }
 
 func (m *AppModel) isTagging() bool {
-	_, isTagging := m.activeModel.(*views.TagModel)
-	return isTagging
+	if dm, ok := m.activeModel.(*views.DetailModel); ok {
+		return dm.IsTagging()
+	}
+	return false
 }
 
 func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {

@@ -6,9 +6,10 @@ import (
 )
 
 type searchRequest struct {
-	JQL    string   `json:"jql"`
-	Expand string   `json:"expand,omitempty"`
-	Fields []string `json:"fields,omitempty"`
+	MaxResults int      `json:"maxResults"`
+	JQL        string   `json:"jql"`
+	Expand     string   `json:"expand,omitempty"`
+	Fields     []string `json:"fields,omitempty"`
 }
 
 type searchResponse struct {

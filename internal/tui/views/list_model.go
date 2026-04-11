@@ -130,6 +130,19 @@ func getItemsList(tickets []model.Ticket) []list.Item {
 	return items
 }
 
+func (m *ListModel) AllTags() []string {
+	seen := make(map[string]bool)
+	var tags []string
+	for _, t := range m.tickets {
+		for _, tag := range t.Tags {
+			if !seen[tag] {
+				seen[tag] = true
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
+}
 func (m *ListModel) SetItems(tickets []model.Ticket) {
 	items := getItemsList(tickets)
 	m.tickets = tickets

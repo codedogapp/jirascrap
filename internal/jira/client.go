@@ -33,7 +33,8 @@ func NewClient(cfg *config.Config) *Client {
 func (c *Client) FetchTickets() ([]model.Ticket, error) {
 	url := fmt.Sprintf("%s/rest/api/3/search/jql", c.domain)
 	reqBody := searchRequest{
-		JQL: c.jql,
+		MaxResults: 100,
+		JQL:        c.jql,
 		Fields: []string{
 			"summary",
 			"status",
