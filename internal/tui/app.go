@@ -71,6 +71,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case views.TagsFilledMsg:
 		return m.handleTagFilled(msg)
 
+	case views.TodosChangedMsg:
+		return m.handleTodosChanged(msg)
+
 	case tagSavedMsg:
 		return m.handleTagSaved(msg)
 

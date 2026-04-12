@@ -11,6 +11,7 @@ type KeyMap struct {
 	GoBack         key.Binding
 	Select         key.Binding
 	ToggleTagging  key.Binding
+	ToggleTodo     key.Binding
 	ToggleDebug    key.Binding
 	ToggleHelp     key.Binding
 	Viewport       viewport.KeyMap
@@ -46,6 +47,11 @@ func newKeyMap() *KeyMap {
 			key.WithHelp("t", "tag"),
 		),
 
+		ToggleTodo: key.NewBinding(
+			key.WithKeys("n"),
+			key.WithHelp("n", "todo"),
+		),
+
 		ToggleDebug: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "debug"),
@@ -67,6 +73,7 @@ func (k *KeyMap) ShortHelp() []key.Binding {
 		k.Viewport.PageUp,
 		k.Viewport.PageDown,
 		k.ToggleTagging,
+		k.ToggleTodo,
 		k.ToggleHelp,
 	}
 }
@@ -75,8 +82,8 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
-		{k.ToggleTagging, k.GoBack},
-		{k.Quit, k.ToggleDebug},
+		{k.ToggleTagging, k.ToggleTodo},
+		{k.GoBack, k.Quit, k.ToggleDebug},
 	}
 }
 

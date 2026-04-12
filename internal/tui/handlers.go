@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
@@ -50,7 +51,11 @@ func (m *AppModel) handleError(msg views.ErrMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea.Cmd) {
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles, m.list.AllTags())
+	todos, err := m.store.GetTodos(msg.Ticket.ID)
+	if err != nil {
+		todos = nil
+	}
+	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles, m.list.AllTags(), todos)
 	return m, nil
 }
 
@@ -61,6 +66,10 @@ func (m *AppModel) handleGoToList(_ views.GoToListMsg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) handleTagFilled(msg views.TagsFilledMsg) (tea.Model, tea.Cmd) {
 	return m, m.saveTagsCmd(msg.ID, msg.Tags)
+}
+
+func (m *AppModel) handleTodosChanged(msg views.TodosChangedMsg) (tea.Model, tea.Cmd) {
+	return m, m.saveTodosCmd(msg.TicketID, msg.Todos)
 }
 
 func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
@@ -115,7 +124,7 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 func (m *AppModel) isTagging() bool {
 	if dm, ok := m.activeModel.(*views.DetailModel); ok {
-		return dm.IsTagging()
+		return dm.IsTagging() || dm.IsTodoing()
 	}
 	return false
 }
@@ -128,5 +137,15 @@ func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
 		}
 
 		return tagSavedMsg{id: id, tags: tags}
+	}
+}
+
+func (m *AppModel) saveTodosCmd(ticketID string, todos []model.Todo) tea.Cmd {
+	return func() tea.Msg {
+		err := m.store.SaveTodos(ticketID, todos)
+		if err != nil {
+			return views.ErrMsg{Err: err}
+		}
+		return todoSavedMsg{}
 	}
 }

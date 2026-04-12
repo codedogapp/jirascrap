@@ -10,3 +10,5 @@ type tagSavedMsg struct {
 	id   string
 	tags []string
 }
+
+type todoSavedMsg struct{}

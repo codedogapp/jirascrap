@@ -186,10 +186,12 @@ func (m *TagModel) View() *lipgloss.Layer {
 		popupContent += "\n\n" + m.renderSuggestions()
 	}
 
-	popupView := tagViewPopUp.Render(popupContent)
+	popupContentStyled := lipgloss.NewStyle().Padding(1, 1).Render(popupContent)
+
+	popupView := tagViewPopUp.Render(popupContentStyled)
 
 	overlayWidth := m.contentWidth / RatioWidth
-	dashes := strings.Repeat("─", overlayWidth-1)
+	dashes := strings.Repeat("─", overlayWidth+1)
 	topLine := topBorder.Render("╭─ ") +
 		popUpTitle.Render("TAG") +
 		topBorder.Render(" "+dashes+"╮")

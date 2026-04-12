@@ -2,6 +2,8 @@ package store
 
 import (
 	"database/sql"
+
+	"github.com/codedogapp/jirascrap/internal/model"
 )
 
 type LocalMeta struct {
@@ -13,6 +15,8 @@ type MetaStore interface {
 	SaveMeta(id string, tags []string, notes string) error
 	GetAllMeta() (map[string]LocalMeta, error)
 	GetUniqueTags() ([]string, error)
+	GetTodos(ticketID string) ([]model.Todo, error)
+	SaveTodos(ticketID string, todos []model.Todo) error
 }
 
 type SqliteMetaStore struct {
@@ -125,4 +129,58 @@ func (s *SqliteMetaStore) GetUniqueTags() ([]string, error) {
 	}
 
 	return tags, nil
+}
+
+func (s *SqliteMetaStore) GetTodos(ticketID string) ([]model.Todo, error) {
+	rows, err := s.db.Query(
+		`SELECT title, done FROM issue_todos WHERE ticket_id = ? ORDER BY id ASC`,
+		ticketID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var todos []model.Todo
+	for rows.Next() {
+		var title string
+		var done int
+		if err := rows.Scan(&title, &done); err != nil {
+			return nil, err
+		}
+		todos = append(todos, model.Todo{Title: title, Done: done != 0})
+	}
+	return todos, nil
+}
+
+func (s *SqliteMetaStore) SaveTodos(ticketID string, todos []model.Todo) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM issue_todos WHERE ticket_id = ?`, ticketID); err != nil {
+		return err
+	}
+
+	if len(todos) > 0 {
+		stmt, err := tx.Prepare(`INSERT INTO issue_todos (ticket_id, title, done) VALUES (?, ?, ?)`)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		for _, t := range todos {
+			done := 0
+			if t.Done {
+				done = 1
+			}
+			if _, err := stmt.Exec(ticketID, t.Title, done); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
 }

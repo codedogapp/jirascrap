@@ -20,6 +20,7 @@ type DetailModel struct {
 	help            help.Model
 	availableHeight int
 	tagModel        *TagModel
+	todoModel       *TodoModel
 }
 
 type GoToListMsg struct{}
@@ -35,6 +36,7 @@ func NewDetailModel(
 	height int,
 	style Styles,
 	allTags []string,
+	todos []model.Todo,
 ) ActiveModel {
 	w, h := style.App.GetFrameSize()
 
@@ -59,10 +61,21 @@ func NewDetailModel(
 		help:            help,
 		availableHeight: availableHeight,
 		tagModel:        NewTagModel(contentWidth, availableHeight, allTags),
+		todoModel:       NewTodoModel(contentWidth, availableHeight, ticket.ID, todos),
 	}
 }
 
 func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
+	if m.todoModel.IsVisible() {
+		switch {
+		case key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && !m.todoModel.IsAdding():
+			m.todoModel.Toggle()
+			return m, nil
+		default:
+			return m, m.todoModel.Update(msg)
+		}
+	}
+
 	if m.tagModel.IsVisible() {
 		switch {
 		case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
@@ -90,6 +103,10 @@ func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTagging):
 		return m, m.tagModel.Show(m.ticket)
+
+	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTodo):
+		m.todoModel.Toggle()
+		return m, nil
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleHelp):
 		m.help.ShowAll = !m.help.ShowAll
@@ -174,9 +191,16 @@ func (m *DetailModel) IsTagging() bool {
 	return m.tagModel.IsVisible()
 }
 
+func (m *DetailModel) IsTodoing() bool {
+	return m.todoModel.IsVisible()
+}
+
 func (m *DetailModel) UpdateMsg(msg tea.Msg) tea.Cmd {
 	if m.tagModel.IsVisible() {
 		return m.tagModel.UpdateMsg(msg)
+	}
+	if m.todoModel.IsVisible() && m.todoModel.IsAdding() {
+		return m.todoModel.UpdateMsg(msg)
 	}
 	return nil
 }
@@ -184,6 +208,15 @@ func (m *DetailModel) UpdateMsg(msg tea.Msg) tea.Cmd {
 func (m *DetailModel) View() tea.View {
 	helpView := styleHelp(m.help.View(keymaps.DefaultKeyMap))
 	base := m.viewport.View() + "\n" + helpView
+
+	if overlay := m.todoModel.View(); overlay != nil {
+		return tea.NewView(
+			lipgloss.NewCompositor(
+				lipgloss.NewLayer(base),
+				overlay,
+			).Render(),
+		)
+	}
 
 	if overlay := m.tagModel.View(); overlay != nil {
 		return tea.NewView(
