@@ -97,7 +97,3 @@ Run the e2e demo (requires [vhs](https://github.com/charmbracelet/vhs), ttyd, an
 ```
 bash e2e/run.sh
 ```
-
-## License
-
-MIT
