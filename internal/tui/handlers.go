@@ -131,7 +131,7 @@ func (m *AppModel) isTagging() bool {
 
 func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
 	return func() tea.Msg {
-		err := m.store.SaveMeta(id, tags, "")
+		err := m.store.SaveMeta(id, tags)
 		if err != nil {
 			return views.ErrMsg{Err: err}
 		}
