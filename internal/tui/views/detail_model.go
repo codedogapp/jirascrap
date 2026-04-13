@@ -191,6 +191,14 @@ func getMetaData(ticket model.Ticket, width int) string {
 	return sb.String()
 }
 
+func (m *DetailModel) UpdateTags(ticket model.Ticket, allTags []string) {
+	m.ticket = ticket
+	contentWidth := m.viewport.Width()
+	markdown := getContent(ticket, contentWidth)
+	m.viewport.SetContent(getMetaData(ticket, contentWidth) + markdown)
+	m.tagModel.SetAllTags(allTags)
+}
+
 func (m *DetailModel) IsTagging() bool {
 	return m.tagModel.IsVisible()
 }

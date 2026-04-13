@@ -161,6 +161,10 @@ func (m *TagModel) UpdateMsg(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
+func (m *TagModel) SetAllTags(tags []string) {
+	m.allTags = tags
+}
+
 func (m *TagModel) SetSize(contentWidth, contentHeight int) {
 	m.contentWidth = contentWidth
 	m.contentHeight = contentHeight

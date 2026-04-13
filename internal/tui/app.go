@@ -10,8 +10,6 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
-// TODO: define key bindings
-
 type AppModel struct {
 	// Dependencies
 	jiraClient *jira.Client

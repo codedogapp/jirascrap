@@ -79,9 +79,10 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 			return views.ErrMsg{Err: err}
 		}
 	}
-	return m, func() tea.Msg {
-		return views.SelectTicketMsg{Ticket: *ticket}
+	if dm, ok := m.activeModel.(*views.DetailModel); ok {
+		dm.UpdateTags(*ticket, m.list.AllTags())
 	}
+	return m, nil
 }
 
 func handleQuit(m *AppModel, msg tea.KeyPressMsg) tea.Cmd {
