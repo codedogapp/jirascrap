@@ -20,3 +20,10 @@ mise.local.toml
 
 # db
 data/
+
+# e2e build artifacts
+e2e/jirascrap-e2e
+e2e/jirascrap
+e2e/mock-server
+
+.DS_Store

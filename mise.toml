@@ -13,6 +13,10 @@ description = "Run without building"
 run = "rm -f jirascrap"
 description = "Remove build artefacts"
 
+[tasks.e2e]
+run = "bash e2e/run.sh"
+description = "Run e2e demo tape (requires vhs)"
+
 [env]
 JIRA_BASE_URL = { required = "Set your organization's Jira Base URL" }
 JIRA_EMAIL = { required = "Set your Email used for Jira" }
