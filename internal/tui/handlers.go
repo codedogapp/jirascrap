@@ -91,7 +91,7 @@ func handleQuit(m *AppModel, msg tea.KeyPressMsg) tea.Cmd {
 		return tea.Quit
 	}
 
-	if s == "q" && !m.isTagging() {
+	if s == "q" && !m.isPopupActive() {
 		return tea.Quit
 	}
 
@@ -103,7 +103,7 @@ func handleQuit(m *AppModel, msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if msg.String() == "d" && !m.isTagging() {
+	if msg.String() == "d" && !m.isPopupActive() {
 		m.debugModel.Toggle()
 		return true, nil
 	}
@@ -122,7 +122,7 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	return false, nil
 }
 
-func (m *AppModel) isTagging() bool {
+func (m *AppModel) isPopupActive() bool {
 	if dm, ok := m.activeModel.(*views.DetailModel); ok {
 		return dm.IsTagging() || dm.IsTodoing()
 	}

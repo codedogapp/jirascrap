@@ -92,13 +92,20 @@ func (m *TodoModel) updateAdding(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "enter":
 		value := strings.TrimSpace(m.textInput.Value())
+
 		if value != "" {
 			items := m.list.Items()
 			items = append(items, model.Todo{Title: value})
 			m.list.SetItems(items)
 		}
+
 		m.textInput.SetValue("")
 		m.adding = false
+
+		if value == "" {
+			return nil
+		}
+
 		return m.todosChangedCmd()
 	case "esc":
 		m.textInput.SetValue("")
