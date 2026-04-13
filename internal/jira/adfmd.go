@@ -7,23 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	adfParagraph   = "paragraph"
-	adfHeading     = "heading"
-	adfBulletList  = "bulletList"
-	adfOrderedList = "orderedList"
-	adfCodeBlock   = "codeBlock"
-	adfBlockquote  = "blockquote"
-	adfRule        = "rule"
-	adfTable       = "table"
-	adfText        = "text"
-	adfMention     = "mention"
-	adfEmoji       = "emoji"
-	adfHardBreak   = "hardBreak"
-	adfInlineCard  = "inlineCard"
-	adfListItem    = "listItem"
-)
-
 // ADFToMarkdown converts an ADF document to Markdown text
 func ADFToMarkdown(node any) string {
 	return adfToMarkdown(node)

@@ -150,7 +150,7 @@ func newTodoKeyMap() *TodoKeyMap {
 			key.WithHelp("a", "add"),
 		),
 		Toggle: key.NewBinding(
-			key.WithKeys(" ", "enter"),
+			key.WithKeys("space", "enter"),
 			key.WithHelp("space", "toggle"),
 		),
 		Delete: key.NewBinding(
