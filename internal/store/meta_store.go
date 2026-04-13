@@ -7,12 +7,11 @@ import (
 )
 
 type LocalMeta struct {
-	Tags  []string
-	Notes string
+	Tags []string
 }
 
 type MetaStore interface {
-	SaveMeta(id string, tags []string, notes string) error
+	SaveMeta(id string, tags []string) error
 	GetAllMeta() (map[string]LocalMeta, error)
 	GetUniqueTags() ([]string, error)
 	GetTodos(ticketID string) ([]model.Todo, error)
@@ -29,22 +28,12 @@ func NewSqliteMetaStore(db *sql.DB) *SqliteMetaStore {
 	}
 }
 
-func (s *SqliteMetaStore) SaveMeta(id string, tags []string, notes string) error {
+func (s *SqliteMetaStore) SaveMeta(id string, tags []string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-
-	query := `
-	INSERT INTO issue_notes (id, notes) VALUES (?, ?)
-	ON CONFLICT(id) DO UPDATE SET notes = excluded.notes;
-	`
-
-	_, err = tx.Exec(query, id, notes)
-	if err != nil {
-		return err
-	}
 
 	_, err = tx.Exec(`DELETE FROM issue_tags WHERE id = ?`, id)
 	if err != nil {
@@ -71,21 +60,6 @@ func (s *SqliteMetaStore) SaveMeta(id string, tags []string, notes string) error
 func (s *SqliteMetaStore) GetAllMeta() (map[string]LocalMeta, error) {
 	metaMap := make(map[string]LocalMeta)
 
-	noteRows, err := s.db.Query(`SELECT id, notes FROM issue_notes`)
-	if err != nil {
-		return nil, err
-	}
-	defer noteRows.Close()
-
-	for noteRows.Next() {
-		var id, notes string
-		err := noteRows.Scan(&id, &notes)
-		if err != nil {
-			return nil, err
-		}
-		metaMap[id] = LocalMeta{Notes: notes, Tags: []string{}}
-	}
-
 	tagRows, err := s.db.Query(`SELECT id, tag FROM issue_tags`)
 	if err != nil {
 		return nil, err
@@ -101,7 +75,7 @@ func (s *SqliteMetaStore) GetAllMeta() (map[string]LocalMeta, error) {
 
 		meta, exists := metaMap[id]
 		if !exists {
-			meta = LocalMeta{Notes: "", Tags: []string{}}
+			meta = LocalMeta{Tags: []string{}}
 		}
 
 		meta.Tags = append(meta.Tags, tag)
