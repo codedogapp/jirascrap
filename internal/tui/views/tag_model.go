@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 )
 
 type TagModel struct {
@@ -65,8 +67,8 @@ func (m *TagModel) TicketID() string {
 }
 
 func (m *TagModel) Update(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "tab":
+	switch {
+	case key.Matches(msg, keymaps.DefaultTagKeyMap.Autocomplete):
 		if len(m.suggestions) > 0 {
 			if m.selectedIdx < 0 {
 				m.selectedIdx = 0
@@ -74,12 +76,12 @@ func (m *TagModel) Update(msg tea.KeyPressMsg) tea.Cmd {
 			m.completeSuggestion()
 		}
 		return nil
-	case "down":
+	case key.Matches(msg, keymaps.DefaultTagKeyMap.NextSuggestion):
 		if len(m.suggestions) > 0 && m.selectedIdx < len(m.suggestions)-1 {
 			m.selectedIdx++
 		}
 		return nil
-	case "up":
+	case key.Matches(msg, keymaps.DefaultTagKeyMap.PrevSuggestion):
 		if len(m.suggestions) > 0 && m.selectedIdx > 0 {
 			m.selectedIdx--
 		}

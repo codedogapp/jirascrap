@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
@@ -86,13 +88,11 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 }
 
 func handleQuit(m *AppModel, msg tea.KeyPressMsg) tea.Cmd {
-	s := msg.String()
-
-	if s == "ctrl+c" {
+	if key.Matches(msg, keymaps.DefaultKeyMap.ForceQuit) {
 		return tea.Quit
 	}
 
-	if s == "q" && !m.isPopupActive() {
+	if key.Matches(msg, keymaps.DefaultKeyMap.Quit) && !m.isPopupActive() {
 		return tea.Quit
 	}
 
@@ -100,7 +100,7 @@ func handleQuit(m *AppModel, msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if msg.String() == "d" && !m.isPopupActive() {
+	if key.Matches(msg, keymaps.DefaultKeyMap.ToggleDebug) && !m.isPopupActive() {
 		if m.debugModel.IsVisible() {
 			m.debugModel.Hide()
 		} else {
@@ -111,7 +111,7 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 	isVisible := m.debugModel.IsVisible()
 
-	if msg.String() == "esc" && isVisible {
+	if key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && isVisible {
 		m.debugModel.Hide()
 		return true, nil
 	}

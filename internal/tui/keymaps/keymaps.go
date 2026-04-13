@@ -101,3 +101,71 @@ func (k *KeyMap) computeFullHelpHeight() int {
 	}
 	return max - 1
 }
+
+type TagKeyMap struct {
+	Autocomplete   key.Binding
+	NextSuggestion key.Binding
+	PrevSuggestion key.Binding
+}
+
+var DefaultTagKeyMap = newTagKeyMap()
+
+func newTagKeyMap() *TagKeyMap {
+	return &TagKeyMap{
+		Autocomplete: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "autocomplete"),
+		),
+		NextSuggestion: key.NewBinding(
+			key.WithKeys("down"),
+			key.WithHelp("↓", "next"),
+		),
+		PrevSuggestion: key.NewBinding(
+			key.WithKeys("up"),
+			key.WithHelp("↑", "prev"),
+		),
+	}
+}
+
+type TodoKeyMap struct {
+	Add     key.Binding
+	Toggle  key.Binding
+	Delete  key.Binding
+	Confirm key.Binding
+	Cancel  key.Binding
+}
+
+var DefaultTodoKeyMap = newTodoKeyMap()
+
+func newTodoKeyMap() *TodoKeyMap {
+	return &TodoKeyMap{
+		Add: key.NewBinding(
+			key.WithKeys("a"),
+			key.WithHelp("a", "add"),
+		),
+		Toggle: key.NewBinding(
+			key.WithKeys(" ", "enter"),
+			key.WithHelp("space", "toggle"),
+		),
+		Delete: key.NewBinding(
+			key.WithKeys("x"),
+			key.WithHelp("x", "delete"),
+		),
+		Confirm: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "confirm"),
+		),
+		Cancel: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "close"),
+		),
+	}
+}
+
+func (k *TodoKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Add, k.Toggle, k.Delete, k.Cancel}
+}
+
+func (k *TodoKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}

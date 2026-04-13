@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 )
 
 type TodosChangedMsg struct {
@@ -97,8 +98,8 @@ func (m *TodoModel) Update(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func (m *TodoModel) updateAdding(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "enter":
+	switch {
+	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Confirm):
 		value := strings.TrimSpace(m.textInput.Value())
 
 		if value != "" {
@@ -115,7 +116,7 @@ func (m *TodoModel) updateAdding(msg tea.KeyPressMsg) tea.Cmd {
 		}
 
 		return m.todosChangedCmd()
-	case "esc":
+	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Cancel):
 		m.textInput.SetValue("")
 		m.adding = false
 		return nil
@@ -127,12 +128,12 @@ func (m *TodoModel) updateAdding(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "a":
+	switch {
+	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Add):
 		m.adding = true
 		m.textInput.SetValue("")
 		return m.textInput.Focus()
-	case "space", "enter":
+	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Toggle):
 		if i, ok := m.list.SelectedItem().(TodoItem); ok {
 			idx := m.list.Index()
 			i.Done = !i.Done
@@ -141,7 +142,7 @@ func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
 			m.list.SetItems(items)
 		}
 		return m.todosChangedCmd()
-	case "x":
+	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Delete):
 		idx := m.list.Index()
 		items := m.list.Items()
 		if idx >= 0 && idx < len(items) {
@@ -149,7 +150,7 @@ func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
 			m.list.SetItems(items)
 		}
 		return m.todosChangedCmd()
-	case "q":
+	case key.Matches(msg, keymaps.DefaultKeyMap.Quit):
 		return nil
 	}
 
@@ -199,7 +200,7 @@ func (m *TodoModel) View() *lipgloss.Layer {
 	if m.adding {
 		content += "\n" + m.textInput.View()
 	}
-	content += "\n" + m.help.View(todoKeys)
+	content += "\n" + m.help.View(keymaps.DefaultTodoKeyMap)
 
 	contentStyled := lipgloss.NewStyle().Padding(1, 1).Render(content)
 
@@ -250,22 +251,4 @@ func (d todoDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 
 	fmt.Fprintf(w, "%s", style.Render(cursor+checkbox+i.Title))
-}
-
-// todoKeyMap implements help.KeyMap for the todo popup.
-type todoKeyMap struct{}
-
-var todoKeys = todoKeyMap{}
-
-func (k todoKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{
-		key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
-		key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle")),
-		key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "delete")),
-		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
-	}
-}
-
-func (k todoKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{k.ShortHelp()}
 }
