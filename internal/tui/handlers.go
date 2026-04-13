@@ -57,7 +57,11 @@ func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea
 	if err != nil {
 		todos = nil
 	}
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles, m.list.AllTags(), todos)
+	allTags, err := m.store.GetUniqueTags()
+	if err != nil {
+		allTags = nil
+	}
+	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles, allTags, todos)
 	return m, nil
 }
 
@@ -82,7 +86,11 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if dm, ok := m.activeModel.(*views.DetailModel); ok {
-		dm.UpdateTags(*ticket, m.list.AllTags())
+		allTags, err := m.store.GetUniqueTags()
+		if err != nil {
+			allTags = nil
+		}
+		dm.UpdateTags(*ticket, allTags)
 	}
 	return m, nil
 }
