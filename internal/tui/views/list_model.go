@@ -45,6 +45,7 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 		return []key.Binding{
 			keymaps.DefaultKeyMap.ToggleDebug,
 			keymaps.DefaultKeyMap.Select,
+			keymaps.DefaultKeyMap.Refresh,
 		}
 	}
 
@@ -143,6 +144,14 @@ func (m *ListModel) Initialize(tickets []model.Ticket) {
 
 func (m *ListModel) StopSpinner() {
 	m.list.StopSpinner()
+}
+
+func (m *ListModel) SetTitle(title string) {
+	m.list.Title = title
+}
+
+func (m *ListModel) HasTickets() bool {
+	return len(m.tickets) > 0
 }
 
 func (d ticketDelegate) Height() int {

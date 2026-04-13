@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/codedogapp/jirascrap/internal/model"
 )
@@ -16,6 +17,9 @@ type MetaStore interface {
 	GetUniqueTags() ([]string, error)
 	GetTodos(ticketID string) ([]model.Todo, error)
 	SaveTodos(ticketID string, todos []model.Todo) error
+	// CacheTickets - Full cache replacement, removes tickets no longer returned by Jira
+	CacheTickets(tickets []model.Ticket) error
+	GetCachedTickets() ([]model.Ticket, error)
 }
 
 type SqliteMetaStore struct {
@@ -170,4 +174,63 @@ func (s *SqliteMetaStore) SaveTodos(ticketID string, todos []model.Todo) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *SqliteMetaStore) CacheTickets(tickets []model.Ticket) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM ticket_cache`); err != nil {
+		return err
+	}
+
+	if len(tickets) == 0 {
+		return tx.Commit()
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO ticket_cache (id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, t := range tickets {
+		if _, err := stmt.Exec(
+			t.ID, t.Summary, t.Reporter, t.Status, t.StatusCategory,
+			t.Priority, t.CreatedAt.Format(time.RFC3339), t.UpdatedAt.Format(time.RFC3339), t.Markdown,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *SqliteMetaStore) GetCachedTickets() ([]model.Ticket, error) {
+	rows, err := s.db.Query(`SELECT id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown FROM ticket_cache`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tickets []model.Ticket
+	for rows.Next() {
+		var t model.Ticket
+		var createdAt, updatedAt string
+		if err := rows.Scan(&t.ID, &t.Summary, &t.Reporter, &t.Status, &t.StatusCategory, &t.Priority, &createdAt, &updatedAt, &t.Markdown); err != nil {
+			return nil, err
+		}
+		t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		t.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		tickets = append(tickets, t)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tickets, nil
 }

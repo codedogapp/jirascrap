@@ -3,8 +3,13 @@ package tui
 import "github.com/codedogapp/jirascrap/internal/model"
 
 type (
-	ticketsFetchedMsg []model.Ticket
+	cachedTicketsLoadedMsg []model.Ticket
+	syncCompleteMsg        []model.Ticket
 )
+
+type syncErrorMsg struct {
+	err error
+}
 
 type tagSavedMsg struct {
 	id   string

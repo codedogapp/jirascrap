@@ -13,6 +13,7 @@ type KeyMap struct {
 	ToggleTagging  key.Binding
 	ToggleTodo     key.Binding
 	ToggleDebug    key.Binding
+	Refresh        key.Binding
 	ToggleHelp     key.Binding
 	Viewport       viewport.KeyMap
 	fullHelpHeight int
@@ -62,6 +63,11 @@ func newKeyMap() *KeyMap {
 			key.WithHelp("?", "more"),
 		),
 
+		Refresh: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh"),
+		),
+
 		Viewport: viewport.DefaultKeyMap(),
 	}
 	k.fullHelpHeight = k.computeFullHelpHeight()
@@ -83,7 +89,7 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
 		{k.ToggleTagging, k.ToggleTodo},
-		{k.GoBack, k.Quit, k.ToggleDebug},
+		{k.GoBack, k.Quit, k.ToggleDebug, k.Refresh},
 	}
 }
 

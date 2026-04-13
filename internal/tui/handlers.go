@@ -8,26 +8,38 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
-func (m *AppModel) fetchTickets() tea.Cmd {
+func (m *AppModel) loadCachedTickets() tea.Cmd {
+	return func() tea.Msg {
+		tickets, err := m.store.GetCachedTickets()
+		if err != nil || len(tickets) == 0 {
+			return cachedTicketsLoadedMsg(nil)
+		}
+		m.mergeLocalMeta(tickets)
+		return cachedTicketsLoadedMsg(tickets)
+	}
+}
+
+func (m *AppModel) syncFromJira() tea.Cmd {
 	return func() tea.Msg {
 		tickets, err := m.jiraClient.FetchTickets()
 		if err != nil {
-			return views.ErrMsg{Err: err}
+			return syncErrorMsg{err: err}
 		}
+		_ = m.store.CacheTickets(tickets)
+		m.mergeLocalMeta(tickets)
+		return syncCompleteMsg(tickets)
+	}
+}
 
-		localData, err := m.store.GetAllMeta()
-		if err != nil {
-			return views.ErrMsg{Err: err}
+func (m *AppModel) mergeLocalMeta(tickets []model.Ticket) {
+	localData, err := m.store.GetAllMeta()
+	if err != nil {
+		return
+	}
+	for i, t := range tickets {
+		if meta, ok := localData[t.ID]; ok {
+			tickets[i].Tags = meta.Tags
 		}
-
-		for i, t := range tickets {
-			meta, exists := localData[t.ID]
-			if exists {
-				tickets[i].Tags = meta.Tags
-			}
-		}
-
-		return ticketsFetchedMsg(tickets)
 	}
 }
 
@@ -41,8 +53,35 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-func (m *AppModel) handleTicketsFetched(msg ticketsFetchedMsg) (tea.Model, tea.Cmd) {
-	m.list.Initialize(msg)
+func (m *AppModel) handleCachedTicketsLoaded(msg cachedTicketsLoadedMsg) (tea.Model, tea.Cmd) {
+	if m.synced {
+		return m, nil
+	}
+	tickets := []model.Ticket(msg)
+	if len(tickets) > 0 {
+		m.list.Initialize(tickets)
+		m.list.SetTitle("Jira Tickets (syncing...)")
+	}
+	return m, nil
+}
+
+func (m *AppModel) handleSyncComplete(msg syncCompleteMsg) (tea.Model, tea.Cmd) {
+	m.synced = true
+	m.syncing = false
+	m.list.SetItems([]model.Ticket(msg))
+	m.list.StopSpinner()
+	m.list.SetTitle("Jira Tickets")
+	return m, nil
+}
+
+func (m *AppModel) handleSyncError(msg syncErrorMsg) (tea.Model, tea.Cmd) {
+	m.syncing = false
+	m.list.SetTitle("Jira Tickets")
+	if m.list.HasTickets() {
+		return m, nil
+	}
+	m.err = views.ErrMsg{Err: msg.err}
+	m.list.StopSpinner()
 	return m, nil
 }
 
@@ -128,6 +167,15 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return true, m.debugModel.Update(msg)
 	}
 
+	return false, nil
+}
+
+func handleRefresh(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if key.Matches(msg, keymaps.DefaultKeyMap.Refresh) && !m.isPopupActive() && !m.syncing {
+		m.syncing = true
+		m.list.SetTitle("Jira Tickets (syncing...)")
+		return true, m.syncFromJira()
+	}
 	return false, nil
 }
 

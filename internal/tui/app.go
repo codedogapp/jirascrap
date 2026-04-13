@@ -20,6 +20,8 @@ type AppModel struct {
 	activeModel views.ActiveModel
 	debugModel  *views.DebugModel
 	err         error
+	syncing     bool
+	synced      bool
 
 	styles views.Styles
 	width  int
@@ -41,9 +43,11 @@ func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
 }
 
 func (m *AppModel) Init() tea.Cmd {
+	m.syncing = true
 	return tea.Batch(
 		m.list.StartSpinner(),
-		m.fetchTickets(),
+		m.loadCachedTickets(),
+		m.syncFromJira(),
 	)
 }
 
@@ -53,8 +57,14 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 
-	case ticketsFetchedMsg:
-		return m.handleTicketsFetched(msg)
+	case cachedTicketsLoadedMsg:
+		return m.handleCachedTicketsLoaded(msg)
+
+	case syncCompleteMsg:
+		return m.handleSyncComplete(msg)
+
+	case syncErrorMsg:
+		return m.handleSyncError(msg)
 
 	case views.ErrMsg:
 		return m.handleError(msg)
@@ -80,6 +90,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		if consumed, cmd := handleDebug(m, msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := handleRefresh(m, msg); consumed {
 			return m, cmd
 		}
 		m.activeModel, cmd = m.activeModel.Update(msg)
