@@ -41,11 +41,13 @@ func NewDebugModel(width int, height int) *DebugModel {
 	}
 }
 
-func (m *DebugModel) Toggle() {
-	m.visible = !m.visible
-	if m.visible {
-		m.viewport.SetContent(formatLogs())
-	}
+func (m *DebugModel) Show() {
+	m.visible = true
+	m.viewport.SetContent(formatLogs())
+}
+
+func (m *DebugModel) Hide() {
+	m.visible = false
 }
 
 func (m *DebugModel) View() *lipgloss.Layer {

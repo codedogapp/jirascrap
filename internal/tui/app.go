@@ -6,7 +6,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/jira"
-	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/store"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
@@ -31,7 +30,7 @@ type AppModel struct {
 
 func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
 	styles := views.NewStyles()
-	listModel := views.NewListModel([]model.Ticket{}, styles.App)
+	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
 	return &AppModel{
 		jiraClient:  client,

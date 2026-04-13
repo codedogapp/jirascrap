@@ -39,7 +39,7 @@ func newKeyMap() *KeyMap {
 
 		Select: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "Select"),
+			key.WithHelp("enter", "select"),
 		),
 
 		ToggleTagging: key.NewBinding(

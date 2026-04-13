@@ -19,6 +19,12 @@ type TodosChangedMsg struct {
 	Todos    []model.Todo
 }
 
+type TodoItem struct {
+	model.Todo
+}
+
+func (i TodoItem) FilterValue() string { return i.Title }
+
 type TodoModel struct {
 	list          list.Model
 	help          help.Model
@@ -38,7 +44,7 @@ func NewTodoModel(contentWidth, contentHeight int, ticketID string, todos []mode
 
 	items := make([]list.Item, len(todos))
 	for i, t := range todos {
-		items[i] = t
+		items[i] = TodoItem{t}
 	}
 
 	delegate := todoDelegate{}
@@ -66,11 +72,13 @@ func NewTodoModel(contentWidth, contentHeight int, ticketID string, todos []mode
 	}
 }
 
-func (m *TodoModel) Toggle() {
-	m.visible = !m.visible
-	if !m.visible {
-		m.adding = false
-	}
+func (m *TodoModel) Show() {
+	m.visible = true
+}
+
+func (m *TodoModel) Hide() {
+	m.visible = false
+	m.adding = false
 }
 
 func (m *TodoModel) IsVisible() bool {
@@ -95,7 +103,7 @@ func (m *TodoModel) updateAdding(msg tea.KeyPressMsg) tea.Cmd {
 
 		if value != "" {
 			items := m.list.Items()
-			items = append(items, model.Todo{Title: value})
+			items = append(items, TodoItem{model.Todo{Title: value}})
 			m.list.SetItems(items)
 		}
 
@@ -125,7 +133,7 @@ func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
 		m.textInput.SetValue("")
 		return m.textInput.Focus()
 	case "space", "enter":
-		if i, ok := m.list.SelectedItem().(model.Todo); ok {
+		if i, ok := m.list.SelectedItem().(TodoItem); ok {
 			idx := m.list.Index()
 			i.Done = !i.Done
 			items := m.list.Items()
@@ -154,8 +162,8 @@ func (m *TodoModel) todosChangedCmd() tea.Cmd {
 	items := m.list.Items()
 	todos := make([]model.Todo, 0, len(items))
 	for _, item := range items {
-		if t, ok := item.(model.Todo); ok {
-			todos = append(todos, t)
+		if t, ok := item.(TodoItem); ok {
+			todos = append(todos, t.Todo)
 		}
 	}
 	ticketID := m.ticketID
@@ -221,7 +229,7 @@ func (d todoDelegate) Spacing() int                            { return 0 }
 func (d todoDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
 func (d todoDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	i, ok := item.(model.Todo)
+	i, ok := item.(TodoItem)
 	if !ok {
 		return
 	}

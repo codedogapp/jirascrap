@@ -95,23 +95,23 @@ func handleQuit(m *AppModel, msg tea.KeyPressMsg) tea.Cmd {
 		return tea.Quit
 	}
 
-	if m.activeModel == nil {
-		return nil
-	}
-
 	return nil
 }
 
 func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if msg.String() == "d" && !m.isPopupActive() {
-		m.debugModel.Toggle()
+		if m.debugModel.IsVisible() {
+			m.debugModel.Hide()
+		} else {
+			m.debugModel.Show()
+		}
 		return true, nil
 	}
 
 	isVisible := m.debugModel.IsVisible()
 
 	if msg.String() == "esc" && isVisible {
-		m.debugModel.Toggle()
+		m.debugModel.Hide()
 		return true, nil
 	}
 

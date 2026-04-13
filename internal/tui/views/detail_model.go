@@ -17,7 +17,7 @@ import (
 type DetailModel struct {
 	ticket          model.Ticket
 	viewport        viewport.Model
-	help            help.Model
+	helpModel       help.Model
 	availableHeight int
 	tagModel        *TagModel
 	todoModel       *TodoModel
@@ -52,13 +52,13 @@ func NewDetailModel(
 
 	vp.SetContent(getMetaData(ticket, contentWidth) + markdown)
 
-	help := help.New()
-	help.SetWidth(contentWidth)
+	helpModel := help.New()
+	helpModel.SetWidth(contentWidth)
 
 	return &DetailModel{
 		ticket:          ticket,
 		viewport:        vp,
-		help:            help,
+		helpModel:       helpModel,
 		availableHeight: availableHeight,
 		tagModel:        NewTagModel(contentWidth, availableHeight, allTags),
 		todoModel:       NewTodoModel(contentWidth, availableHeight, ticket.ID, todos),
@@ -69,7 +69,7 @@ func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 	if m.todoModel.IsVisible() {
 		switch {
 		case key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && !m.todoModel.IsAdding():
-			m.todoModel.Toggle()
+			m.todoModel.Hide()
 			return m, nil
 		default:
 			return m, m.todoModel.Update(msg)
@@ -105,12 +105,16 @@ func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 		return m, m.tagModel.Show(m.ticket)
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTodo):
-		m.todoModel.Toggle()
+		if m.todoModel.IsVisible() {
+			m.todoModel.Hide()
+		} else {
+			m.todoModel.Show()
+		}
 		return m, nil
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleHelp):
-		m.help.ShowAll = !m.help.ShowAll
-		if m.help.ShowAll {
+		m.helpModel.ShowAll = !m.helpModel.ShowAll
+		if m.helpModel.ShowAll {
 			m.viewport.SetHeight(m.availableHeight - keymaps.DefaultKeyMap.GetFullHelpHeight())
 		} else {
 			m.viewport.SetHeight(m.availableHeight)
@@ -206,7 +210,7 @@ func (m *DetailModel) UpdateMsg(msg tea.Msg) tea.Cmd {
 }
 
 func (m *DetailModel) View() tea.View {
-	helpView := styleHelp(m.help.View(keymaps.DefaultKeyMap))
+	helpView := styleHelp(m.helpModel.View(keymaps.DefaultKeyMap))
 	base := m.viewport.View() + "\n" + helpView
 
 	if overlay := m.todoModel.View(); overlay != nil {
