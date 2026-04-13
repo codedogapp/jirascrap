@@ -82,6 +82,10 @@ func (s *SqliteMetaStore) GetAllMeta() (map[string]LocalMeta, error) {
 		metaMap[id] = meta
 	}
 
+	if err := tagRows.Err(); err != nil {
+		return nil, err
+	}
+
 	return metaMap, nil
 }
 
@@ -100,6 +104,10 @@ func (s *SqliteMetaStore) GetUniqueTags() ([]string, error) {
 			return nil, err
 		}
 		tags = append(tags, tag)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return tags, nil
@@ -124,6 +132,11 @@ func (s *SqliteMetaStore) GetTodos(ticketID string) ([]model.Todo, error) {
 		}
 		todos = append(todos, model.Todo{Title: title, Done: done != 0})
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return todos, nil
 }
 
