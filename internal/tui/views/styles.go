@@ -42,7 +42,7 @@ var (
 
 	dimStyle = lipgloss.NewStyle().
 			Foreground(grey).
-			Padding(0, 2)
+			Padding(0, 0, 0, 2)
 
 	tagStyle = lipgloss.NewStyle().
 			Background(colPrimary).
