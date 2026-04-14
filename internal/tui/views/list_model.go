@@ -74,12 +74,12 @@ func (i TicketItem) FilterValue() string {
 		" " +
 		i.Ticket.Status +
 		" " +
-		strings.Join(i.Ticket.Tags, " ")
+		"#" + strings.Join(i.Ticket.Tags, " #")
 }
 
 func (m *ListModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
 	if key.Matches(msg, keymaps.DefaultKeyMap.Select) &&
-		m.list.FilterState() != list.Filtering {
+		!m.IsFiltering() {
 		if i, ok := m.list.SelectedItem().(TicketItem); ok {
 			return m, func() tea.Msg {
 				return SelectTicketMsg(i)
@@ -144,6 +144,10 @@ func (m *ListModel) Initialize(tickets []model.Ticket) {
 
 func (m *ListModel) StopSpinner() {
 	m.list.StopSpinner()
+}
+
+func (m *ListModel) IsFiltering() bool {
+	return m.list.FilterState() == list.Filtering
 }
 
 func (m *ListModel) SetTitle(title string) {

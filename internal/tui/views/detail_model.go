@@ -268,7 +268,7 @@ func styleStatus(statusCategory string, status string, sb *strings.Builder) {
 func stylePriority(priority string, sb *strings.Builder) {
 	priorityC := priorityColor(priority)
 	if priority != "" {
-		sb.WriteString("  ")
+		sb.WriteString(" ")
 		sb.WriteString(
 			lipgloss.NewStyle().
 				Foreground(priorityC).

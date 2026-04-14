@@ -171,7 +171,7 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 }
 
 func handleRefresh(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if key.Matches(msg, keymaps.DefaultKeyMap.Refresh) && !m.isPopupActive() && !m.syncing {
+	if key.Matches(msg, keymaps.DefaultKeyMap.Refresh) && !m.isPopupActive() && !m.syncing && !m.list.IsFiltering() {
 		m.syncing = true
 		m.list.SetTitle("Jira Tickets (syncing...)")
 		return true, m.syncFromJira()

@@ -3,10 +3,11 @@
 
 Output e2e/demo.gif
 Set Shell bash
-Set FontSize 14
-Set Width 1200
-Set Height 700
+Set FontSize 20
+Set Width 1920
+Set Height 1080
 Set Padding 10
+Set FontFamily "FiraMono Nerd Font Mono"
 Set Theme "Dracula"
 
 # Start the app (env vars set by run.sh)
