@@ -117,15 +117,19 @@ func (m *AppModel) View() tea.View {
 	debug := m.debugModel.View()
 
 	if debug != nil {
-		return tea.NewView(
+		v := tea.NewView(
 			lipgloss.NewCompositor(
 				lipgloss.NewLayer(base),
 				debug,
 			).Render(),
 		)
+		v.AltScreen = true
+		return v
 	}
 
-	return tea.NewView(base)
+	v := tea.NewView(base)
+	v.AltScreen = true
+	return v
 }
 
 func Run(client *jira.Client, s store.MetaStore) error {

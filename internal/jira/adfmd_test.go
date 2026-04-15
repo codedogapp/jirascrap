@@ -23,11 +23,17 @@ func adf(content ...any) map[string]any {
 }
 
 func paragraph(inlines ...any) map[string]any {
-	return map[string]any{"type": "paragraph", "content": inlines}
+	return map[string]any{
+		"type":    "paragraph",
+		"content": inlines,
+	}
 }
 
 func text(s string) map[string]any {
-	return map[string]any{"type": "text", "text": s}
+	return map[string]any{
+		"type": "text",
+		"text": s,
+	}
 }
 
 func textWithMark(s string, marks ...map[string]any) map[string]any {
@@ -35,7 +41,11 @@ func textWithMark(s string, marks ...map[string]any) map[string]any {
 	for i, m := range marks {
 		ms[i] = m
 	}
-	return map[string]any{"type": "text", "text": s, "marks": ms}
+	return map[string]any{
+		"type":  "text",
+		"text":  s,
+		"marks": ms,
+	}
 }
 
 func mark(markType string) map[string]any {
@@ -43,7 +53,10 @@ func mark(markType string) map[string]any {
 }
 
 func linkMark(href string) map[string]any {
-	return map[string]any{"type": "link", "attrs": map[string]any{"href": href}}
+	return map[string]any{
+		"type":  "link",
+		"attrs": map[string]any{"href": href},
+	}
 }
 
 func heading(level int, inlines ...any) map[string]any {
@@ -55,15 +68,24 @@ func heading(level int, inlines ...any) map[string]any {
 }
 
 func bulletList(items ...any) map[string]any {
-	return map[string]any{"type": "bulletList", "content": items}
+	return map[string]any{
+		"type":    "bulletList",
+		"content": items,
+	}
 }
 
 func orderedList(items ...any) map[string]any {
-	return map[string]any{"type": "orderedList", "content": items}
+	return map[string]any{
+		"type":    "orderedList",
+		"content": items,
+	}
 }
 
 func listItem(blocks ...any) map[string]any {
-	return map[string]any{"type": "listItem", "content": blocks}
+	return map[string]any{
+		"type":    "listItem",
+		"content": blocks,
+	}
 }
 
 func codeBlock(lang string, code string) map[string]any {
@@ -75,7 +97,10 @@ func codeBlock(lang string, code string) map[string]any {
 }
 
 func blockquote(blocks ...any) map[string]any {
-	return map[string]any{"type": "blockquote", "content": blocks}
+	return map[string]any{
+		"type":    "blockquote",
+		"content": blocks,
+	}
 }
 
 func rule() map[string]any {
@@ -84,8 +109,11 @@ func rule() map[string]any {
 
 func mention(name, id string) map[string]any {
 	return map[string]any{
-		"type":  "mention",
-		"attrs": map[string]any{"text": "@" + name, "id": id},
+		"type": "mention",
+		"attrs": map[string]any{
+			"text": "@" + name,
+			"id":   id,
+		},
 	}
 }
 

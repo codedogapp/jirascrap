@@ -198,14 +198,26 @@ func TestCacheTickets_AndGetCached(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	tickets := []model.Ticket{
 		{
-			ID: "PROJ-1", Summary: "First", Reporter: "Alice",
-			Status: "Open", StatusCategory: "To Do", Priority: "High",
-			CreatedAt: now, UpdatedAt: now, Markdown: "# Description",
+			ID:             "PROJ-1",
+			Summary:        "First",
+			Reporter:       "Alice",
+			Status:         "Open",
+			StatusCategory: "To Do",
+			Priority:       "High",
+			CreatedAt:      now,
+			UpdatedAt:      now,
+			Markdown:       "# Description",
 		},
 		{
-			ID: "PROJ-2", Summary: "Second", Reporter: "Bob",
-			Status: "Done", StatusCategory: "Done", Priority: "Low",
-			CreatedAt: now, UpdatedAt: now, Markdown: "body",
+			ID:             "PROJ-2",
+			Summary:        "Second",
+			Reporter:       "Bob",
+			Status:         "Done",
+			StatusCategory: "Done",
+			Priority:       "Low",
+			CreatedAt:      now,
+			UpdatedAt:      now,
+			Markdown:       "body",
 		},
 	}
 

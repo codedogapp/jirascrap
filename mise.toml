@@ -10,8 +10,8 @@ run = "go run ."
 description = "Run without building"
 
 [tasks.clean]
-run = "rm -f jirascrap"
-description = "Remove build artefacts"
+run = "rm -f jirascrap.out"
+description = "Remove build artifacts"
 
 [tasks.e2e]
 run = "bash e2e/run.sh"
