@@ -105,7 +105,11 @@ func TestMergeLocalMeta_EmptyMeta(t *testing.T) {
 func TestIsPopupActive_OnList(t *testing.T) {
 	styles := views.NewStyles()
 	list := views.NewListModel(nil, styles.App)
-	app := &AppModel{activeModel: list}
+	app := &AppModel{
+		activeModel: list,
+		tagModel:    views.NewTagModel(0, 0, nil),
+		todoModel:   views.NewTodoModel(0, 0, "", nil),
+	}
 
 	if app.isPopupActive() {
 		t.Error("expected false on list view")
@@ -116,9 +120,13 @@ func TestIsPopupActive_OnDetail_NoPopup(t *testing.T) {
 	styles := views.NewStyles()
 	detail := views.NewDetailModel(
 		model.Ticket{ID: "T-1", Summary: "test"},
-		80, 24, styles, nil, nil,
+		80, 24, styles,
 	)
-	app := &AppModel{activeModel: detail}
+	app := &AppModel{
+		activeModel: detail,
+		tagModel:    views.NewTagModel(0, 0, nil),
+		todoModel:   views.NewTodoModel(0, 0, "", nil),
+	}
 
 	if app.isPopupActive() {
 		t.Error("expected false when no popup is open")

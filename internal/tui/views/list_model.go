@@ -41,8 +41,18 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 		0,
 	)
 	l.Title = "Jira Tickets"
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			keymaps.DefaultKeyMap.ToggleTagging,
+			keymaps.DefaultKeyMap.ToggleTodo,
+			keymaps.DefaultKeyMap.OpenInBrowser,
+		}
+	}
 	l.AdditionalFullHelpKeys = func() []key.Binding {
 		return []key.Binding{
+			keymaps.DefaultKeyMap.ToggleTagging,
+			keymaps.DefaultKeyMap.ToggleTodo,
+			keymaps.DefaultKeyMap.OpenInBrowser,
 			keymaps.DefaultKeyMap.ToggleDebug,
 			keymaps.DefaultKeyMap.Select,
 			keymaps.DefaultKeyMap.Refresh,
@@ -156,6 +166,13 @@ func (m *ListModel) SetTitle(title string) {
 
 func (m *ListModel) HasTickets() bool {
 	return len(m.tickets) > 0
+}
+
+func (m *ListModel) SelectedTicket() (model.Ticket, bool) {
+	if i, ok := m.list.SelectedItem().(TicketItem); ok {
+		return i.Ticket, true
+	}
+	return model.Ticket{}, false
 }
 
 func (d ticketDelegate) Height() int {

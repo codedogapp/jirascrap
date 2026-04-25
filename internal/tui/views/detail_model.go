@@ -19,8 +19,6 @@ type DetailModel struct {
 	viewport        viewport.Model
 	helpModel       help.Model
 	availableHeight int
-	tagModel        *TagModel
-	todoModel       *TodoModel
 }
 
 type GoToListMsg struct{}
@@ -35,8 +33,6 @@ func NewDetailModel(
 	width int,
 	height int,
 	style Styles,
-	allTags []string,
-	todos []model.Todo,
 ) ActiveModel {
 	w, h := style.App.GetFrameSize()
 
@@ -60,57 +56,15 @@ func NewDetailModel(
 		viewport:        vp,
 		helpModel:       helpModel,
 		availableHeight: availableHeight,
-		tagModel:        NewTagModel(contentWidth, availableHeight, allTags),
-		todoModel:       NewTodoModel(contentWidth, availableHeight, ticket.ID, todos),
 	}
 }
 
 func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
-	if m.todoModel.IsVisible() {
-		switch {
-		case key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && !m.todoModel.IsAdding():
-			m.todoModel.Hide()
-			return m, nil
-		default:
-			return m, m.todoModel.Update(msg)
-		}
-	}
-
-	if m.tagModel.IsVisible() {
-		switch {
-		case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
-			m.tagModel.Hide()
-			return m, nil
-
-		case key.Matches(msg, keymaps.DefaultKeyMap.Select):
-			id := m.tagModel.TicketID()
-			tags := m.tagModel.CurrentTags()
-			m.tagModel.Hide()
-			return m, func() tea.Msg {
-				return TagsFilledMsg{ID: id, Tags: tags}
-			}
-
-		default:
-			return m, m.tagModel.Update(msg)
-		}
-	}
-
 	switch {
 	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
 		return m, func() tea.Msg {
 			return GoToListMsg{}
 		}
-
-	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTagging):
-		return m, m.tagModel.Show(m.ticket)
-
-	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleTodo):
-		if m.todoModel.IsVisible() {
-			m.todoModel.Hide()
-		} else {
-			m.todoModel.Show()
-		}
-		return m, nil
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleHelp):
 		m.helpModel.ShowAll = !m.helpModel.ShowAll
@@ -191,55 +145,20 @@ func getMetaData(ticket model.Ticket, width int) string {
 	return sb.String()
 }
 
-func (m *DetailModel) UpdateTags(ticket model.Ticket, allTags []string) {
+func (m *DetailModel) UpdateTags(ticket model.Ticket) {
 	m.ticket = ticket
 	contentWidth := m.viewport.Width()
 	markdown := getContent(ticket, contentWidth)
 	m.viewport.SetContent(getMetaData(ticket, contentWidth) + markdown)
-	m.tagModel.SetAllTags(allTags)
 }
 
-func (m *DetailModel) IsTagging() bool {
-	return m.tagModel.IsVisible()
-}
-
-func (m *DetailModel) IsTodoing() bool {
-	return m.todoModel.IsVisible()
-}
-
-func (m *DetailModel) UpdateMsg(msg tea.Msg) tea.Cmd {
-	if m.tagModel.IsVisible() {
-		return m.tagModel.UpdateMsg(msg)
-	}
-	if m.todoModel.IsVisible() && m.todoModel.IsAdding() {
-		return m.todoModel.UpdateMsg(msg)
-	}
-	return nil
+func (m *DetailModel) Ticket() model.Ticket {
+	return m.ticket
 }
 
 func (m *DetailModel) View() tea.View {
 	helpView := styleHelp(m.helpModel.View(keymaps.DefaultKeyMap))
-	base := m.viewport.View() + "\n" + helpView
-
-	if overlay := m.todoModel.View(); overlay != nil {
-		return tea.NewView(
-			lipgloss.NewCompositor(
-				lipgloss.NewLayer(base),
-				overlay,
-			).Render(),
-		)
-	}
-
-	if overlay := m.tagModel.View(); overlay != nil {
-		return tea.NewView(
-			lipgloss.NewCompositor(
-				lipgloss.NewLayer(base),
-				overlay,
-			).Render(),
-		)
-	}
-
-	return tea.NewView(base)
+	return tea.NewView(m.viewport.View() + "\n" + helpView)
 }
 
 func getContent(ticket model.Ticket, width int) string {

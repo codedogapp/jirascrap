@@ -15,6 +15,7 @@ type KeyMap struct {
 	ToggleDebug    key.Binding
 	Refresh        key.Binding
 	ToggleHelp     key.Binding
+	OpenInBrowser  key.Binding
 	Viewport       viewport.KeyMap
 	fullHelpHeight int
 }
@@ -68,6 +69,11 @@ func newKeyMap() *KeyMap {
 			key.WithHelp("r", "refresh"),
 		),
 
+		OpenInBrowser: key.NewBinding(
+			key.WithKeys("o"),
+			key.WithHelp("o", "open"),
+		),
+
 		Viewport: viewport.DefaultKeyMap(),
 	}
 	k.fullHelpHeight = k.computeFullHelpHeight()
@@ -80,6 +86,7 @@ func (k *KeyMap) ShortHelp() []key.Binding {
 		k.Viewport.PageDown,
 		k.ToggleTagging,
 		k.ToggleTodo,
+		k.OpenInBrowser,
 		k.ToggleHelp,
 	}
 }
@@ -88,7 +95,7 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
-		{k.ToggleTagging, k.ToggleTodo},
+		{k.ToggleTagging, k.ToggleTodo, k.OpenInBrowser},
 		{k.GoBack, k.Quit, k.ToggleDebug, k.Refresh},
 	}
 }
