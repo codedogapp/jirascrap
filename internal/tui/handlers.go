@@ -1,6 +1,10 @@
 package tui
 
 import (
+	"fmt"
+	"os/exec"
+	"strings"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
@@ -50,6 +54,12 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.width = msg.Width
 	m.height = msg.Height
 
+	w, h := m.styles.App.GetFrameSize()
+	contentWidth := msg.Width - w
+	contentHeight := msg.Height - h
+	m.tagModel.SetSize(contentWidth, contentHeight)
+	m.todoModel.SetSize(contentWidth, contentHeight)
+
 	return m, nil
 }
 
@@ -92,15 +102,7 @@ func (m *AppModel) handleError(msg views.ErrMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea.Cmd) {
-	todos, err := m.store.GetTodos(msg.Ticket.ID)
-	if err != nil {
-		todos = nil
-	}
-	allTags, err := m.store.GetUniqueTags()
-	if err != nil {
-		allTags = nil
-	}
-	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles, allTags, todos)
+	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
 	return m, nil
 }
 
@@ -124,12 +126,10 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 			return views.ErrMsg{Err: err}
 		}
 	}
+	allTags, _ := m.store.GetUniqueTags()
+	m.tagModel.SetAllTags(allTags)
 	if dm, ok := m.activeModel.(*views.DetailModel); ok {
-		allTags, err := m.store.GetUniqueTags()
-		if err != nil {
-			allTags = nil
-		}
-		dm.UpdateTags(*ticket, allTags)
+		dm.UpdateTags(*ticket)
 	}
 	return m, nil
 }
@@ -180,10 +180,101 @@ func handleRefresh(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 }
 
 func (m *AppModel) isPopupActive() bool {
-	if dm, ok := m.activeModel.(*views.DetailModel); ok {
-		return dm.IsTagging() || dm.IsTodoing()
+	return m.tagModel.IsVisible() || m.todoModel.IsVisible()
+}
+
+func (m *AppModel) selectedTicket() (model.Ticket, bool) {
+	switch v := m.activeModel.(type) {
+	case *views.ListModel:
+		return v.SelectedTicket()
+	case *views.DetailModel:
+		return v.Ticket(), true
 	}
-	return false
+	return model.Ticket{}, false
+}
+
+func (m *AppModel) handleTagKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
+		m.tagModel.Hide()
+		return m, nil
+	case key.Matches(msg, keymaps.DefaultKeyMap.Select):
+		id := m.tagModel.TicketID()
+		tags := m.tagModel.CurrentTags()
+		m.tagModel.Hide()
+		return m, func() tea.Msg {
+			return views.TagsFilledMsg{ID: id, Tags: tags}
+		}
+	default:
+		return m, m.tagModel.Update(msg)
+	}
+}
+
+func (m *AppModel) handleTodoKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && !m.todoModel.IsAdding():
+		m.todoModel.Hide()
+		return m, nil
+	default:
+		return m, m.todoModel.Update(msg)
+	}
+}
+
+func (m *AppModel) handleToggleTag(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if !key.Matches(msg, keymaps.DefaultKeyMap.ToggleTagging) {
+		return false, nil
+	}
+	if m.list.IsFiltering() {
+		return false, nil
+	}
+	ticket, ok := m.selectedTicket()
+	if !ok {
+		return false, nil
+	}
+	allTags, _ := m.store.GetUniqueTags()
+	m.tagModel.SetAllTags(allTags)
+	return true, m.tagModel.Show(ticket)
+}
+
+func (m *AppModel) handleToggleTodo(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if !key.Matches(msg, keymaps.DefaultKeyMap.ToggleTodo) {
+		return false, nil
+	}
+	if m.list.IsFiltering() {
+		return false, nil
+	}
+	ticket, ok := m.selectedTicket()
+	if !ok {
+		return false, nil
+	}
+	if m.todoModel.IsVisible() {
+		m.todoModel.Hide()
+		return true, nil
+	}
+	todos, _ := m.store.GetTodos(ticket.ID)
+	w, h := m.styles.App.GetFrameSize()
+	m.todoModel = views.NewTodoModel(m.width-w, m.height-h, ticket.ID, todos)
+	m.todoModel.Show()
+	return true, nil
+}
+
+func (m *AppModel) handleOpenInBrowser(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if !key.Matches(msg, keymaps.DefaultKeyMap.OpenInBrowser) {
+		return false, nil
+	}
+	if m.list.IsFiltering() {
+		return false, nil
+	}
+	ticket, ok := m.selectedTicket()
+	if !ok {
+		return false, nil
+	}
+	domain := strings.TrimRight(m.domain, "/")
+	ticketURL := fmt.Sprintf("%s/browse/%s", domain, ticket.ID)
+	return true, func() tea.Msg {
+		_ = exec.Command("open", ticketURL).Start()
+		return nil
+	}
 }
 
 func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {

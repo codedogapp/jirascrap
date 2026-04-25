@@ -14,11 +14,14 @@ type AppModel struct {
 	// Dependencies
 	jiraClient *jira.Client
 	store      store.MetaStore
+	domain     string
 
 	// State
 	list        *views.ListModel
 	activeModel views.ActiveModel
 	debugModel  *views.DebugModel
+	tagModel    *views.TagModel
+	todoModel   *views.TodoModel
 	err         error
 	syncing     bool
 	synced      bool
@@ -28,16 +31,19 @@ type AppModel struct {
 	height int
 }
 
-func NewApp(client *jira.Client, s store.MetaStore) *AppModel {
+func NewApp(client *jira.Client, s store.MetaStore, domain string) *AppModel {
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
 	return &AppModel{
 		jiraClient:  client,
 		store:       s,
+		domain:      domain,
 		list:        listModel,
 		activeModel: listModel,
 		debugModel:  debugModel,
+		tagModel:    views.NewTagModel(0, 0, nil),
+		todoModel:   views.NewTodoModel(0, 0, "", nil),
 		styles:      styles,
 	}
 }
@@ -92,13 +98,36 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if consumed, cmd := handleDebug(m, msg); consumed {
 			return m, cmd
 		}
+		// Route keys to popups when active
+		if m.tagModel.IsVisible() {
+			return m.handleTagKey(msg)
+		}
+		if m.todoModel.IsVisible() {
+			return m.handleTodoKey(msg)
+		}
 		if consumed, cmd := handleRefresh(m, msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleOpenInBrowser(msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleToggleTag(msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleToggleTodo(msg); consumed {
 			return m, cmd
 		}
 		m.activeModel, cmd = m.activeModel.Update(msg)
 		return m, cmd
 
 	default:
+		// Route non-key messages to active popup for text input blinking etc.
+		if m.tagModel.IsVisible() {
+			return m, m.tagModel.UpdateMsg(msg)
+		}
+		if m.todoModel.IsVisible() && m.todoModel.IsAdding() {
+			return m, m.todoModel.UpdateMsg(msg)
+		}
 		if mu, ok := m.activeModel.(views.MsgUpdater); ok {
 			return m, mu.UpdateMsg(msg)
 		}
@@ -115,14 +144,22 @@ func (m *AppModel) View() tea.View {
 	base := m.styles.App.Render(m.activeModel.View().Content)
 
 	debug := m.debugModel.View()
+	todoOverlay := m.todoModel.View()
+	tagOverlay := m.tagModel.View()
 
-	if debug != nil {
-		v := tea.NewView(
-			lipgloss.NewCompositor(
-				lipgloss.NewLayer(base),
-				debug,
-			).Render(),
-		)
+	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil
+	if hasOverlay {
+		layers := []*lipgloss.Layer{lipgloss.NewLayer(base)}
+		if todoOverlay != nil {
+			layers = append(layers, todoOverlay)
+		}
+		if tagOverlay != nil {
+			layers = append(layers, tagOverlay)
+		}
+		if debug != nil {
+			layers = append(layers, debug)
+		}
+		v := tea.NewView(lipgloss.NewCompositor(layers...).Render())
 		v.AltScreen = true
 		return v
 	}
@@ -132,8 +169,8 @@ func (m *AppModel) View() tea.View {
 	return v
 }
 
-func Run(client *jira.Client, s store.MetaStore) error {
-	app := NewApp(client, s)
+func Run(client *jira.Client, s store.MetaStore, domain string) error {
+	app := NewApp(client, s, domain)
 	p := tea.NewProgram(app)
 	_, err := p.Run()
 	if err != nil {
