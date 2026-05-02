@@ -204,7 +204,8 @@ func (m *TodoModel) View() *lipgloss.Layer {
 
 	contentStyled := lipgloss.NewStyle().Padding(1, 1).Render(content)
 
-	popupView := tagViewPopUp.Width(m.contentWidth).Render(contentStyled)
+	actualWidth := int(float64(m.contentWidth) * 0.7)
+	popupView := tagViewPopUp.Width(actualWidth).Render(contentStyled)
 	popupWidth := lipgloss.Width(popupView)
 
 	dashCount := popupWidth - lipgloss.Width("╭─ TODO ╮")
