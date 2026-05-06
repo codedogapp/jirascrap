@@ -15,4 +15,5 @@ type Ticket struct {
 	Markdown       string
 	Tags           []string
 	Priority       string
+	IsEpic         bool
 }

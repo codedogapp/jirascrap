@@ -62,6 +62,14 @@ func (m *mockStore) GetCachedTickets() ([]model.Ticket, error) {
 	return m.tickets, m.cacheErr
 }
 
+func (m *mockStore) CacheEpicChildren(_ string, _ []model.Ticket) error {
+	return nil
+}
+
+func (m *mockStore) GetAllCachedEpicChildren() (map[string][]model.Ticket, error) {
+	return map[string][]model.Ticket{}, nil
+}
+
 func TestMergeLocalMeta(t *testing.T) {
 	s := &mockStore{
 		meta: map[string]store.LocalMeta{
@@ -77,7 +85,8 @@ func TestMergeLocalMeta(t *testing.T) {
 		{ID: "TICK-3", Summary: "Third"},
 	}
 
-	app.mergeLocalMeta(tickets)
+	localData, _ := app.store.GetAllMeta()
+	applyLocalMeta(tickets, localData)
 
 	if len(tickets[0].Tags) != 2 || tickets[0].Tags[0] != "bug" {
 		t.Errorf("TICK-1 tags = %v", tickets[0].Tags)
@@ -95,7 +104,8 @@ func TestMergeLocalMeta_EmptyMeta(t *testing.T) {
 	app := &AppModel{store: s}
 
 	tickets := []model.Ticket{{ID: "TICK-1"}}
-	app.mergeLocalMeta(tickets)
+	localData, _ := app.store.GetAllMeta()
+	applyLocalMeta(tickets, localData)
 
 	if tickets[0].Tags != nil {
 		t.Errorf("tags = %v, want nil", tickets[0].Tags)

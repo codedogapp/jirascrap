@@ -29,14 +29,19 @@ type priority struct {
 	Name string `json:"name"`
 }
 
+type issueType struct {
+	Name string `json:"name"`
+}
+
 type issueField struct {
-	Summary     string   `json:"summary"`
-	Description any      `json:"description"`
-	Reporter    reporter `json:"reporter"`
-	Status      status   `json:"status"`
-	Priority    priority `json:"priority"`
-	CreatedAt   jiraTime `json:"created"`
-	UpdatedAt   jiraTime `json:"updated"`
+	Summary     string    `json:"summary"`
+	Description any       `json:"description"`
+	Reporter    reporter  `json:"reporter"`
+	Status      status    `json:"status"`
+	Priority    priority  `json:"priority"`
+	IssueType   issueType `json:"issuetype"`
+	CreatedAt   jiraTime  `json:"created"`
+	UpdatedAt   jiraTime  `json:"updated"`
 }
 
 type reporter struct {

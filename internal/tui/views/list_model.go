@@ -197,6 +197,7 @@ func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 
 	styleStatusDot(i.Ticket.StatusCategory, &sb)
 	stylePriorityDot(i.Ticket.Priority, &sb)
+	styleEpicBolt(i.Ticket.IsEpic, &sb)
 
 	sb.WriteString(i.Ticket.ID)
 
@@ -237,6 +238,16 @@ func stylePriorityDot(priority string, sb *strings.Builder) {
 		Render("▲ ")
 
 	sb.WriteString(rendered)
+}
+
+var epicBoltStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("#FFD700"))
+
+func styleEpicBolt(isEpic bool, sb *strings.Builder) {
+	if !isEpic {
+		return
+	}
+	sb.WriteString(epicBoltStyle.Render("⚡ "))
 }
 
 var tagsStyle = lipgloss.NewStyle().

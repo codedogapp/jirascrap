@@ -8,18 +8,25 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/store"
 	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
 func (m *AppModel) loadCachedTickets() tea.Cmd {
 	return func() tea.Msg {
+		localData, _ := m.store.GetAllMeta()
+		epicChildren, _ := m.store.GetAllCachedEpicChildren()
+		for key, children := range epicChildren {
+			applyLocalMeta(children, localData)
+			epicChildren[key] = children
+		}
 		tickets, err := m.store.GetCachedTickets()
 		if err != nil || len(tickets) == 0 {
-			return cachedTicketsLoadedMsg(nil)
+			return cachedTicketsLoadedMsg{epicChildren: epicChildren}
 		}
-		m.mergeLocalMeta(tickets)
-		return cachedTicketsLoadedMsg(tickets)
+		applyLocalMeta(tickets, localData)
+		return cachedTicketsLoadedMsg{tickets: tickets, epicChildren: epicChildren}
 	}
 }
 
@@ -29,17 +36,19 @@ func (m *AppModel) syncFromJira() tea.Cmd {
 		if err != nil {
 			return syncErrorMsg{err: err}
 		}
+		localData, _ := m.store.GetAllMeta()
+		applyLocalMeta(tickets, localData)
+		epicChildren, _ := m.jiraClient.FetchAllEpicChildren(tickets)
+		for epicKey, children := range epicChildren {
+			applyLocalMeta(children, localData)
+			_ = m.store.CacheEpicChildren(epicKey, children)
+		}
 		_ = m.store.CacheTickets(tickets)
-		m.mergeLocalMeta(tickets)
-		return syncCompleteMsg(tickets)
+		return syncCompleteMsg{tickets: tickets, epicChildren: epicChildren}
 	}
 }
 
-func (m *AppModel) mergeLocalMeta(tickets []model.Ticket) {
-	localData, err := m.store.GetAllMeta()
-	if err != nil {
-		return
-	}
+func applyLocalMeta(tickets []model.Ticket, localData map[string]store.LocalMeta) {
 	for i, t := range tickets {
 		if meta, ok := localData[t.ID]; ok {
 			tickets[i].Tags = meta.Tags
@@ -49,6 +58,9 @@ func (m *AppModel) mergeLocalMeta(tickets []model.Ticket) {
 
 func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.list.SetSize(msg.Width, msg.Height)
+	if m.previousList != nil {
+		m.previousList.SetSize(msg.Width, msg.Height)
+	}
 	m.debugModel.SetSize(msg.Width, msg.Height)
 
 	m.width = msg.Width
@@ -63,13 +75,23 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
+// rootList returns the main ticket list, even when navigated into an epic.
+func (m *AppModel) rootList() *views.ListModel {
+	if m.previousList != nil {
+		return m.previousList
+	}
+	return m.list
+}
+
 func (m *AppModel) handleCachedTicketsLoaded(msg cachedTicketsLoadedMsg) (tea.Model, tea.Cmd) {
 	if m.synced {
 		return m, nil
 	}
-	tickets := []model.Ticket(msg)
-	if len(tickets) > 0 {
-		m.list.Initialize(tickets)
+	if msg.epicChildren != nil {
+		m.epicChildren = msg.epicChildren
+	}
+	if len(msg.tickets) > 0 {
+		m.list.Initialize(msg.tickets)
 		m.list.SetTitle("Jira Tickets (syncing...)")
 	}
 	return m, nil
@@ -78,20 +100,23 @@ func (m *AppModel) handleCachedTicketsLoaded(msg cachedTicketsLoadedMsg) (tea.Mo
 func (m *AppModel) handleSyncComplete(msg syncCompleteMsg) (tea.Model, tea.Cmd) {
 	m.synced = true
 	m.syncing = false
-	m.list.SetItems([]model.Ticket(msg))
-	m.list.StopSpinner()
-	m.list.SetTitle("Jira Tickets")
+	m.epicChildren = msg.epicChildren
+	root := m.rootList()
+	root.SetItems(msg.tickets)
+	root.StopSpinner()
+	root.SetTitle("Jira Tickets")
 	return m, nil
 }
 
 func (m *AppModel) handleSyncError(msg syncErrorMsg) (tea.Model, tea.Cmd) {
 	m.syncing = false
-	m.list.SetTitle("Jira Tickets")
-	if m.list.HasTickets() {
+	root := m.rootList()
+	root.SetTitle("Jira Tickets")
+	if root.HasTickets() {
 		return m, nil
 	}
 	m.err = views.ErrMsg{Err: msg.err}
-	m.list.StopSpinner()
+	root.StopSpinner()
 	return m, nil
 }
 
@@ -102,8 +127,59 @@ func (m *AppModel) handleError(msg views.ErrMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea.Cmd) {
+	if msg.Ticket.IsEpic {
+		if children, ok := m.epicChildren[msg.Ticket.ID]; ok {
+			return m.showEpicChildren(msg.Ticket.ID, children)
+		}
+		return m, tea.Batch(m.list.StartSpinner(), m.fetchEpicChildrenCmd(msg.Ticket.ID))
+	}
 	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
 	return m, nil
+}
+
+func (m *AppModel) showEpicChildren(epicKey string, tickets []model.Ticket) (tea.Model, tea.Cmd) {
+	epicList := views.NewListModel(tickets, m.styles.App)
+	epicList.SetSize(m.width, m.height)
+	epicList.SetTitle(fmt.Sprintf("⚡ %s", epicKey))
+	m.previousList = m.list
+	m.list = epicList
+	m.activeModel = epicList
+	return m, nil
+}
+
+func (m *AppModel) fetchEpicChildrenCmd(epicKey string) tea.Cmd {
+	return func() tea.Msg {
+		tickets, err := m.jiraClient.FetchEpicChildren(epicKey)
+		if err != nil {
+			return epicChildrenErrorMsg{err: err}
+		}
+		return epicChildrenLoadedMsg{epicKey: epicKey, tickets: tickets}
+	}
+}
+
+func (m *AppModel) handleEpicChildrenLoaded(msg epicChildrenLoadedMsg) (tea.Model, tea.Cmd) {
+	localData, _ := m.store.GetAllMeta()
+	applyLocalMeta(msg.tickets, localData)
+	m.epicChildren[msg.epicKey] = msg.tickets
+	_ = m.store.CacheEpicChildren(msg.epicKey, msg.tickets)
+	m.list.StopSpinner()
+	return m.showEpicChildren(msg.epicKey, msg.tickets)
+}
+
+func (m *AppModel) handleExitEpic(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if !key.Matches(msg, keymaps.DefaultKeyMap.GoBack) {
+		return false, nil
+	}
+	if m.previousList == nil {
+		return false, nil
+	}
+	if m.list.IsFiltering() {
+		return false, nil
+	}
+	m.list = m.previousList
+	m.previousList = nil
+	m.activeModel = m.list
+	return true, nil
 }
 
 func (m *AppModel) handleGoToList(_ views.GoToListMsg) (tea.Model, tea.Cmd) {
@@ -124,6 +200,17 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, func() tea.Msg {
 			return views.ErrMsg{Err: err}
+		}
+	}
+	if m.previousList != nil {
+		_, _ = m.previousList.UpdateTicket(msg.id, msg.tags)
+	}
+	// Update epic children map so reopening epic shows fresh tags
+	for key, children := range m.epicChildren {
+		for i, c := range children {
+			if c.ID == msg.id {
+				m.epicChildren[key][i].Tags = msg.tags
+			}
 		}
 	}
 	allTags, _ := m.store.GetUniqueTags()
@@ -173,8 +260,9 @@ func handleDebug(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 func handleRefresh(m *AppModel, msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if key.Matches(msg, keymaps.DefaultKeyMap.Refresh) && !m.isPopupActive() && !m.syncing && !m.list.IsFiltering() {
 		m.syncing = true
-		m.list.SetTitle("Jira Tickets (syncing...)")
-		return true, m.syncFromJira()
+		root := m.rootList()
+		root.SetTitle("Jira Tickets (syncing...)")
+		return true, tea.Batch(root.StartSpinner(), m.syncFromJira())
 	}
 	return false, nil
 }

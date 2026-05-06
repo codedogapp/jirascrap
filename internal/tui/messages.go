@@ -2,10 +2,15 @@ package tui
 
 import "github.com/codedogapp/jirascrap/internal/model"
 
-type (
-	cachedTicketsLoadedMsg []model.Ticket
-	syncCompleteMsg        []model.Ticket
-)
+type cachedTicketsLoadedMsg struct {
+	tickets      []model.Ticket
+	epicChildren map[string][]model.Ticket
+}
+
+type syncCompleteMsg struct {
+	tickets      []model.Ticket
+	epicChildren map[string][]model.Ticket
+}
 
 type syncErrorMsg struct {
 	err error
@@ -17,3 +22,12 @@ type tagSavedMsg struct {
 }
 
 type todoSavedMsg struct{}
+
+type epicChildrenLoadedMsg struct {
+	epicKey string
+	tickets []model.Ticket
+}
+
+type epicChildrenErrorMsg struct {
+	err error
+}
