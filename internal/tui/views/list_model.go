@@ -112,24 +112,17 @@ func (m *ListModel) View() tea.View {
 	return tea.NewView(m.list.View())
 }
 
-func (m *ListModel) UpdateTicket(id string, tags []string) (*model.Ticket, error) {
-	var updatedTicket *model.Ticket
-	for i, t := range m.tickets {
+func (m *ListModel) FindTicket(id string) (model.Ticket, bool) {
+	for _, t := range m.tickets {
 		if t.ID == id {
-			ticket := &m.tickets[i]
-			ticket.Tags = tags
-			updatedTicket = ticket
-			break
+			return t, true
 		}
 	}
+	return model.Ticket{}, false
+}
 
-	if updatedTicket == nil {
-		return nil, fmt.Errorf("ticket %s not found", id)
-	}
-
-	m.SetItems(m.tickets)
-
-	return updatedTicket, nil
+func (m *ListModel) Title() string {
+	return m.list.Title
 }
 
 func getItemsList(tickets []model.Ticket) []list.Item {
@@ -197,7 +190,10 @@ func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 
 	styleStatusDot(i.Ticket.StatusCategory, &sb)
 	stylePriorityDot(i.Ticket.Priority, &sb)
-	styleEpicBolt(i.Ticket.IsEpic, &sb)
+
+	if i.Ticket.IsEpic() {
+		styleEpicBolt(&sb)
+	}
 
 	sb.WriteString(i.Ticket.ID)
 
@@ -218,7 +214,8 @@ func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 	)
 }
 
-// STYLES
+// --------- Styles Helpers ---------
+
 func styleStatusDot(statusCategory string, sb *strings.Builder) {
 	statusC := statusColor(statusCategory)
 	rendered := lipgloss.NewStyle().
@@ -240,25 +237,16 @@ func stylePriorityDot(priority string, sb *strings.Builder) {
 	sb.WriteString(rendered)
 }
 
-var epicBoltStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#FFD700"))
-
-func styleEpicBolt(isEpic bool, sb *strings.Builder) {
-	if !isEpic {
-		return
-	}
+func styleEpicBolt(sb *strings.Builder) {
 	sb.WriteString(epicBoltStyle.Render("⚡"))
 }
-
-var tagsStyle = lipgloss.NewStyle().
-	Foreground(colSecondary)
 
 func styleTags(tags []string, sb *strings.Builder) {
 	if len(tags) > 0 {
 		sb.WriteString(" | ")
 		for _, t := range tags {
 			sb.WriteString(
-				tagsStyle.
+				tagListStyle.
 					Render("#" + t + " "),
 			)
 		}

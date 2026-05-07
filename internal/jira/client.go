@@ -12,11 +12,12 @@ import (
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
+const defaultJQL = `assignee = currentUser() AND statusCategory != Done AND status != 'TO DESCRIBE' ORDER BY status DESC`
+
 type Client struct {
 	domain string
 	email  string
 	token  string
-	jql    string
 	http   *http.Client
 }
 
@@ -25,13 +26,12 @@ func NewClient(cfg *config.Config) *Client {
 		domain: cfg.Domain,
 		email:  cfg.Email,
 		token:  cfg.APIToken,
-		jql:    cfg.JQL,
 		http:   &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
 func (c *Client) FetchTickets() ([]model.Ticket, error) {
-	return c.fetchTickets(c.jql)
+	return c.fetchTickets(defaultJQL)
 }
 
 func (c *Client) FetchEpicChildren(epicKey string) ([]model.Ticket, error) {
@@ -95,7 +95,7 @@ func (c *Client) fetchTickets(jql string) ([]model.Ticket, error) {
 			Status:         issue.Fields.Status.Name,
 			StatusCategory: issue.Fields.Status.StatusCategory.Name,
 			Priority:       issue.Fields.Priority.Name,
-			IsEpic:         issue.Fields.IssueType.Name == "Epic",
+			Type:           issue.Fields.IssueType.Name,
 			CreatedAt:      issue.Fields.CreatedAt.Time,
 			UpdatedAt:      issue.Fields.UpdatedAt.Time,
 			Markdown:       ADFToMarkdown(issue.Fields.Description),
@@ -114,7 +114,7 @@ func (c *Client) FetchAllEpicChildren(tickets []model.Ticket) (map[string][]mode
 
 	var epics []model.Ticket
 	for _, t := range tickets {
-		if t.IsEpic {
+		if t.IsEpic() {
 			epics = append(epics, t)
 		}
 	}

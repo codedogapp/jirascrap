@@ -174,7 +174,11 @@ func TestADFToMarkdown_InlineMarks(t *testing.T) {
 		{"code", textWithMark("code", mark("code")), "`code`"},
 		{"strike", textWithMark("strike", mark("strike")), "~~strike~~"},
 		{"underline", textWithMark("underline", mark("underline")), "<u>underline</u>"},
-		{"link", textWithMark("click", linkMark("https://example.com")), "[click](https://example.com)"},
+		{
+			"link",
+			textWithMark("click", linkMark("https://example.com")),
+			"[click](https://example.com)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -271,7 +275,10 @@ func TestADFToMarkdown_Table(t *testing.T) {
 			map[string]any{
 				"type": "tableRow",
 				"content": []any{
-					map[string]any{"type": "tableHeader", "content": []any{paragraph(text("Name"))}},
+					map[string]any{
+						"type":    "tableHeader",
+						"content": []any{paragraph(text("Name"))},
+					},
 					map[string]any{"type": "tableHeader", "content": []any{paragraph(text("Age"))}},
 				},
 			},
@@ -402,14 +409,23 @@ func TestRoundTrip_BulletList(t *testing.T) {
 }
 
 func TestRoundTrip_OpaqueMarker(t *testing.T) {
-	unknown := map[string]any{"type": "panel", "attrs": map[string]any{"panelType": "info"}, "content": []any{paragraph(text("note"))}}
+	unknown := map[string]any{
+		"type":    "panel",
+		"attrs":   map[string]any{"panelType": "info"},
+		"content": []any{paragraph(text("note"))},
+	}
 	original := adf(unknown)
 	md := ADFToMarkdown(original)
 	rebuilt := MarkdownToADF(md)
 	roundTripped := mustJSON(t, rebuilt)
 	// The opaque marker should round-trip through JSON preservation
 	if ADFToMarkdown(rebuilt) != md {
-		t.Errorf("opaque round-trip markdown mismatch:\nfirst:  %q\nsecond: %q\njson: %s", md, ADFToMarkdown(rebuilt), roundTripped)
+		t.Errorf(
+			"opaque round-trip markdown mismatch:\nfirst:  %q\nsecond: %q\njson: %s",
+			md,
+			ADFToMarkdown(rebuilt),
+			roundTripped,
+		)
 	}
 }
 

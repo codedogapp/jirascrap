@@ -2,27 +2,30 @@ package store
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
-type LocalMeta struct {
-	Tags []string
-}
-
 type MetaStore interface {
 	SaveMeta(id string, tags []string) error
-	GetAllMeta() (map[string]LocalMeta, error)
+
 	GetUniqueTags() ([]string, error)
+
 	GetTodos(ticketID string) ([]model.Todo, error)
+
 	SaveTodos(ticketID string, todos []model.Todo) error
-	// CacheTickets - Full cache replacement. Epics go to `epics` table,
-	// non-epic tickets go to `ticket_cache`. Preserves epic children.
+
+	// CacheTickets - Full cache replacement. Stores all tickets in unified
+	// `tickets` table with their type. Preserves epic children.
 	CacheTickets(tickets []model.Ticket) error
+
 	GetCachedTickets() ([]model.Ticket, error)
+
 	// CacheEpicChildren - Replaces cached children for a single epic
 	CacheEpicChildren(epicKey string, tickets []model.Ticket) error
+
 	GetAllCachedEpicChildren() (map[string][]model.Ticket, error)
 }
 
@@ -63,38 +66,6 @@ func (s *SqliteMetaStore) SaveMeta(id string, tags []string) error {
 	}
 
 	return tx.Commit()
-}
-
-func (s *SqliteMetaStore) GetAllMeta() (map[string]LocalMeta, error) {
-	metaMap := make(map[string]LocalMeta)
-
-	tagRows, err := s.db.Query(`SELECT id, tag FROM issue_tags`)
-	if err != nil {
-		return nil, err
-	}
-	defer tagRows.Close()
-
-	for tagRows.Next() {
-		var id, tag string
-		err := tagRows.Scan(&id, &tag)
-		if err != nil {
-			return nil, err
-		}
-
-		meta, exists := metaMap[id]
-		if !exists {
-			meta = LocalMeta{Tags: []string{}}
-		}
-
-		meta.Tags = append(meta.Tags, tag)
-		metaMap[id] = meta
-	}
-
-	if err := tagRows.Err(); err != nil {
-		return nil, err
-	}
-
-	return metaMap, nil
 }
 
 func (s *SqliteMetaStore) GetUniqueTags() ([]string, error) {
@@ -187,10 +158,8 @@ func (s *SqliteMetaStore) CacheTickets(tickets []model.Ticket) error {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM epics`); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM ticket_cache WHERE epic_id IS NULL`); err != nil {
+	_, err = tx.Exec(`DELETE FROM tickets WHERE epic_id IS NULL`)
+	if err != nil {
 		return err
 	}
 
@@ -198,39 +167,46 @@ func (s *SqliteMetaStore) CacheTickets(tickets []model.Ticket) error {
 		return tx.Commit()
 	}
 
-	epicStmt, err := tx.Prepare(`INSERT INTO epics (id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`
+		INSERT INTO tickets (
+			id, 
+		 	summary,
+			reporter, 
+			status,
+			status_category,
+			priority,
+			type,
+			created_at,
+			updated_at,
+			markdown
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
 	if err != nil {
 		return err
 	}
-	defer epicStmt.Close()
-
-	ticketStmt, err := tx.Prepare(`INSERT INTO ticket_cache (id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return err
-	}
-	defer ticketStmt.Close()
+	defer stmt.Close()
 
 	for _, t := range tickets {
-		vals := ticketInsertValues(t)
-		if t.IsEpic {
-			if _, err := epicStmt.Exec(vals...); err != nil {
-				return err
-			}
-		} else {
-			if _, err := ticketStmt.Exec(vals...); err != nil {
-				return err
-			}
+		if _, err := stmt.Exec(ticketInsertValues(t)...); err != nil {
+			return err
 		}
 	}
 
 	return tx.Commit()
 }
 
+// GetCachedTickets returns top-level tickets and epics, with tags pre-joined.
 func (s *SqliteMetaStore) GetCachedTickets() ([]model.Ticket, error) {
 	rows, err := s.db.Query(`
-		SELECT id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown, 1 AS is_epic FROM epics
-		UNION ALL
-		SELECT id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown, 0 AS is_epic FROM ticket_cache WHERE epic_id IS NULL
+		SELECT t.id, t.summary, t.reporter, t.status, t.status_category,
+		       t.priority, t.type, t.created_at, t.updated_at, t.markdown,
+		       GROUP_CONCAT(it.tag) AS tags
+		FROM tickets t
+		LEFT JOIN issue_tags it ON t.id = it.id
+		WHERE t.epic_id IS NULL
+		   OR LOWER(t.type) = 'epic'
+		GROUP BY t.id
+		ORDER BY t.updated_at DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -239,7 +215,7 @@ func (s *SqliteMetaStore) GetCachedTickets() ([]model.Ticket, error) {
 
 	var tickets []model.Ticket
 	for rows.Next() {
-		t, err := scanTicket(rows)
+		t, err := scanTicketWithTags(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -260,12 +236,27 @@ func (s *SqliteMetaStore) CacheEpicChildren(epicKey string, tickets []model.Tick
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM ticket_cache WHERE epic_id = ?`, epicKey); err != nil {
+	_, err = tx.Exec(`DELETE FROM tickets WHERE epic_id = ?`, epicKey)
+	if err != nil {
 		return err
 	}
 
 	if len(tickets) > 0 {
-		stmt, err := tx.Prepare(`INSERT INTO ticket_cache (id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown, epic_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		stmt, err := tx.Prepare(`
+			INSERT OR REPLACE INTO tickets (
+				id, 
+			    summary,
+			   	reporter,
+			   	status,
+			   	status_category,
+				priority, 
+				type, 
+				created_at, 
+			   	updated_at,
+		   		markdown, 
+			   	epic_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`)
 		if err != nil {
 			return err
 		}
@@ -283,7 +274,25 @@ func (s *SqliteMetaStore) CacheEpicChildren(epicKey string, tickets []model.Tick
 }
 
 func (s *SqliteMetaStore) GetAllCachedEpicChildren() (map[string][]model.Ticket, error) {
-	rows, err := s.db.Query(`SELECT epic_id, id, summary, reporter, status, status_category, priority, created_at, updated_at, markdown FROM ticket_cache WHERE epic_id IS NOT NULL ORDER BY epic_id, rowid`)
+	rows, err := s.db.Query(`
+		SELECT t.epic_id, 
+		       t.id,
+		       t.summary,
+		       t.reporter,
+		       t.status,
+		       t.status_category,
+		       t.priority,
+		       t.type,
+		       t.created_at,
+		       t.updated_at,
+		       t.markdown,
+		       GROUP_CONCAT(it.tag) AS tags
+		FROM tickets t
+		LEFT JOIN issue_tags it ON t.id = it.id
+		WHERE t.epic_id IS NOT NULL
+		GROUP BY t.id
+		ORDER BY t.epic_id, t.updated_at DESC
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -294,12 +303,29 @@ func (s *SqliteMetaStore) GetAllCachedEpicChildren() (map[string][]model.Ticket,
 		var epicID string
 		var t model.Ticket
 		var createdAt, updatedAt string
-		if err := rows.Scan(&epicID, &t.ID, &t.Summary, &t.Reporter, &t.Status, &t.StatusCategory, &t.Priority, &createdAt, &updatedAt, &t.Markdown); err != nil {
+		var tags sql.NullString
+		if err := rows.Scan(
+			&epicID,
+			&t.ID,
+			&t.Summary,
+			&t.Reporter,
+			&t.Status,
+			&t.StatusCategory,
+			&t.Priority,
+			&t.Type,
+			&createdAt,
+			&updatedAt,
+			&t.Markdown,
+			&tags,
+		); err != nil {
 			return nil, err
 		}
 		t.EpicID = epicID
 		t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 		t.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		if tags.Valid && tags.String != "" {
+			t.Tags = strings.Split(tags.String, ",")
+		}
 		result[epicID] = append(result[epicID], t)
 	}
 
@@ -310,27 +336,53 @@ func (s *SqliteMetaStore) GetAllCachedEpicChildren() (map[string][]model.Ticket,
 	return result, nil
 }
 
-// Helpers for ticket row scanning/insertion
-
 type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-// scanTicket scans a row from the UNION query (epics + tickets) which includes
-// an is_epic flag as the last column.
-func scanTicket(row rowScanner) (model.Ticket, error) {
+// scanTicketWithTags scans a ticket row with a GROUP_CONCAT(tag) column appended.
+func scanTicketWithTags(row rowScanner) (model.Ticket, error) {
 	var t model.Ticket
 	var createdAt, updatedAt string
-	var isEpic int
-	if err := row.Scan(&t.ID, &t.Summary, &t.Reporter, &t.Status, &t.StatusCategory, &t.Priority, &createdAt, &updatedAt, &t.Markdown, &isEpic); err != nil {
+	var tags sql.NullString
+	if err := row.Scan(
+		&t.ID,
+		&t.Summary,
+		&t.Reporter,
+		&t.Status,
+		&t.StatusCategory,
+		&t.Priority,
+		&t.Type,
+		&createdAt,
+		&updatedAt,
+		&t.Markdown,
+		&tags,
+	); err != nil {
 		return model.Ticket{}, err
 	}
-	t.IsEpic = isEpic != 0
 	t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	t.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	if tags.Valid && tags.String != "" {
+		t.Tags = strings.Split(tags.String, ",")
+	}
 	return t, nil
 }
 
 func ticketInsertValues(t model.Ticket) []any {
-	return []any{t.ID, t.Summary, t.Reporter, t.Status, t.StatusCategory, t.Priority, t.CreatedAt.Format(time.RFC3339), t.UpdatedAt.Format(time.RFC3339), t.Markdown}
+	typ := t.Type
+	if typ == "" {
+		typ = "task"
+	}
+	return []any{
+		t.ID,
+		t.Summary,
+		t.Reporter,
+		t.Status,
+		t.StatusCategory,
+		t.Priority,
+		typ,
+		t.CreatedAt.Format(time.RFC3339),
+		t.UpdatedAt.Format(time.RFC3339),
+		t.Markdown,
+	}
 }

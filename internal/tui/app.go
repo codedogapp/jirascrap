@@ -101,11 +101,11 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTagSaved(msg)
 
 	case tea.KeyPressMsg:
-		cmd := handleQuit(m, msg)
+		cmd := m.handleQuit(msg)
 		if cmd != nil {
 			return m, cmd
 		}
-		if consumed, cmd := handleDebug(m, msg); consumed {
+		if consumed, cmd := m.handleDebug(msg); consumed {
 			return m, cmd
 		}
 		// Route keys to popups when active
@@ -115,10 +115,13 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.todoModel.IsVisible() {
 			return m.handleTodoKey(msg)
 		}
-		if consumed, cmd := handleRefresh(m, msg); consumed {
+		if consumed, cmd := m.handleRefresh(msg); consumed {
 			return m, cmd
 		}
 		if consumed, cmd := m.handleExitEpic(msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleGoHome(msg); consumed {
 			return m, cmd
 		}
 		if consumed, cmd := m.handleOpenInBrowser(msg); consumed {

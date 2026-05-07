@@ -15,6 +15,10 @@ type Ticket struct {
 	Markdown       string
 	Tags           []string
 	Priority       string
-	IsEpic         bool
+	Type           string // issue type from Jira (e.g., "Epic", "Task", "Story", "Bug")
 	EpicID         string // optional, links ticket to parent epic
+}
+
+func (t Ticket) IsEpic() bool {
+	return t.Type == "Epic"
 }

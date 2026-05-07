@@ -28,7 +28,6 @@ Set these environment variables before running:
 | `JIRA_BASE_URL` | Yes | Your Jira instance URL (e.g. `https://yourorg.atlassian.net`) |
 | `JIRA_EMAIL` | Yes | Email associated with your Atlassian account |
 | `JIRA_API_TOKEN` | Yes | API token from [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
-| `JIRA_JQL` | No | Custom JQL query (default: `assignee = currentUser() ORDER BY updated DESC`) |
 | `JIRA_DB_PATH` | No | Path to SQLite database file (default: `./data/jira.db`) |
 
 ## Usage
