@@ -39,33 +39,6 @@ func TestLoad_AllRequired(t *testing.T) {
 	}
 }
 
-func TestLoad_DefaultJQL(t *testing.T) {
-	setEnv(t, requiredEnv())
-	os.Unsetenv("JIRA_JQL")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg.JQL != "assignee = currentUser() ORDER BY updated DESC" {
-		t.Errorf("JQL = %q", cfg.JQL)
-	}
-}
-
-func TestLoad_CustomJQL(t *testing.T) {
-	env := requiredEnv()
-	env["JIRA_JQL"] = "project = TEST"
-	setEnv(t, env)
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg.JQL != "project = TEST" {
-		t.Errorf("JQL = %q", cfg.JQL)
-	}
-}
-
 func TestLoad_DefaultDBPath(t *testing.T) {
 	setEnv(t, requiredEnv())
 	os.Unsetenv("JIRA_DB_PATH")

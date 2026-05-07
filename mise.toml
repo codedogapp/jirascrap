@@ -21,6 +21,5 @@ description = "Run e2e demo tape (requires vhs)"
 JIRA_BASE_URL = { required = "Set your organization's Jira Base URL" }
 JIRA_EMAIL = { required = "Set your Email used for Jira" }
 JIRA_API_TOKEN = { required = "Get your API token from Atlassian Settings" }
-JIRA_JQL = "assignee = currentUser() AND statusCategory != Done AND status != 'TO DESCRIBE' ORDER BY status DESC"
 
 JIRA_DB_PATH = { required = "Set your SQLite path" }

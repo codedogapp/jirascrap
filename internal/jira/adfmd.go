@@ -161,7 +161,14 @@ func inlineToMarkdown(content []any) string {
 			if attrs, ok := inline["attrs"].(map[string]any); ok {
 				displayName, _ := attrs["text"].(string)
 				accountID, _ := attrs["id"].(string)
-				parts = append(parts, fmt.Sprintf("[@%s](accountid:%s)", strings.TrimPrefix(displayName, "@"), accountID))
+				parts = append(
+					parts,
+					fmt.Sprintf(
+						"[@%s](accountid:%s)",
+						strings.TrimPrefix(displayName, "@"),
+						accountID,
+					),
+				)
 			}
 
 		case "emoji":
@@ -642,7 +649,8 @@ func parseList(lines []string, idx *int, listType string) map[string]any {
 			nextLine := lines[*idx]
 			nextTrimmed := strings.TrimSpace(nextLine)
 			nextIndent := len(nextLine) - len(strings.TrimLeft(nextLine, " "))
-			if nextIndent > baseIndent && (strings.HasPrefix(nextTrimmed, "- ") || orderedListRe.MatchString(nextTrimmed)) {
+			if nextIndent > baseIndent &&
+				(strings.HasPrefix(nextTrimmed, "- ") || orderedListRe.MatchString(nextTrimmed)) {
 				nestedType := "bullet"
 				if orderedListRe.MatchString(nextTrimmed) {
 					nestedType = "ordered"

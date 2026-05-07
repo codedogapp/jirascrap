@@ -62,6 +62,10 @@ var (
 
 	topBorder = lipgloss.NewStyle().
 			Foreground(colSecondary)
+
+	tagListStyle = lipgloss.NewStyle().Foreground(colSecondary)
+
+	epicBoltStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5A623"))
 )
 
 func statusColor(status string) color.Color {

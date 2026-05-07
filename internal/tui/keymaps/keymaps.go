@@ -9,6 +9,7 @@ type KeyMap struct {
 	ForceQuit      key.Binding
 	Quit           key.Binding
 	GoBack         key.Binding
+	GoHome         key.Binding
 	Select         key.Binding
 	ToggleTagging  key.Binding
 	ToggleTodo     key.Binding
@@ -37,6 +38,11 @@ func newKeyMap() *KeyMap {
 		GoBack: key.NewBinding(
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "back"),
+		),
+
+		GoHome: key.NewBinding(
+			key.WithKeys("h"),
+			key.WithHelp("h", "home"),
 		),
 
 		Select: key.NewBinding(
@@ -96,7 +102,7 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
 		{k.ToggleTagging, k.ToggleTodo, k.OpenInBrowser},
-		{k.GoBack, k.Quit, k.ToggleDebug, k.Refresh},
+		{k.GoBack, k.GoHome, k.Quit, k.ToggleDebug, k.Refresh},
 	}
 }
 

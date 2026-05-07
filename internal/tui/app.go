@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/jira"
+	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/store"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
@@ -17,14 +18,16 @@ type AppModel struct {
 	domain     string
 
 	// State
-	list        *views.ListModel
-	activeModel views.ActiveModel
-	debugModel  *views.DebugModel
-	tagModel    *views.TagModel
-	todoModel   *views.TodoModel
-	err         error
-	syncing     bool
-	synced      bool
+	list         *views.ListModel
+	previousList *views.ListModel
+	activeModel  views.ActiveModel
+	debugModel   *views.DebugModel
+	tagModel     *views.TagModel
+	todoModel    *views.TodoModel
+	epicChildren map[string][]model.Ticket
+	err          error
+	syncing      bool
+	synced       bool
 
 	styles views.Styles
 	width  int
@@ -36,15 +39,16 @@ func NewApp(client *jira.Client, s store.MetaStore, domain string) *AppModel {
 	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
 	return &AppModel{
-		jiraClient:  client,
-		store:       s,
-		domain:      domain,
-		list:        listModel,
-		activeModel: listModel,
-		debugModel:  debugModel,
-		tagModel:    views.NewTagModel(0, 0, nil),
-		todoModel:   views.NewTodoModel(0, 0, "", nil),
-		styles:      styles,
+		jiraClient:   client,
+		store:        s,
+		domain:       domain,
+		list:         listModel,
+		activeModel:  listModel,
+		debugModel:   debugModel,
+		tagModel:     views.NewTagModel(0, 0, nil),
+		todoModel:    views.NewTodoModel(0, 0, "", nil),
+		epicChildren: make(map[string][]model.Ticket),
+		styles:       styles,
 	}
 }
 
@@ -78,6 +82,12 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case views.SelectTicketMsg:
 		return m.handleSelectTicket(msg)
 
+	case epicChildrenLoadedMsg:
+		return m.handleEpicChildrenLoaded(msg)
+
+	case epicChildrenErrorMsg:
+		return m.handleError(views.ErrMsg{Err: msg.err})
+
 	case views.GoToListMsg:
 		return m.handleGoToList(msg)
 
@@ -91,11 +101,11 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTagSaved(msg)
 
 	case tea.KeyPressMsg:
-		cmd := handleQuit(m, msg)
+		cmd := m.handleQuit(msg)
 		if cmd != nil {
 			return m, cmd
 		}
-		if consumed, cmd := handleDebug(m, msg); consumed {
+		if consumed, cmd := m.handleDebug(msg); consumed {
 			return m, cmd
 		}
 		// Route keys to popups when active
@@ -105,7 +115,13 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.todoModel.IsVisible() {
 			return m.handleTodoKey(msg)
 		}
-		if consumed, cmd := handleRefresh(m, msg); consumed {
+		if consumed, cmd := m.handleRefresh(msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleExitEpic(msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleGoHome(msg); consumed {
 			return m, cmd
 		}
 		if consumed, cmd := m.handleOpenInBrowser(msg); consumed {

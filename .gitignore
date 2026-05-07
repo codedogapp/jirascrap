@@ -28,3 +28,5 @@ e2e/jirascrap
 e2e/mock-server
 
 .DS_Store
+
+.idea

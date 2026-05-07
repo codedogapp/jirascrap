@@ -56,7 +56,6 @@ func TestFetchTickets_Success(t *testing.T) {
 		domain: server.URL,
 		email:  "test@example.com",
 		token:  "test-token",
-		jql:    "project = PROJ",
 		http:   server.Client(),
 	}
 
@@ -66,8 +65,8 @@ func TestFetchTickets_Success(t *testing.T) {
 	}
 
 	// Verify request body
-	if receivedReq.JQL != "project = PROJ" {
-		t.Errorf("request JQL = %q", receivedReq.JQL)
+	if receivedReq.JQL != defaultJQL {
+		t.Errorf("request JQL = %q, want %q", receivedReq.JQL, defaultJQL)
 	}
 	if receivedReq.MaxResults != 100 {
 		t.Errorf("request MaxResults = %d", receivedReq.MaxResults)
@@ -112,7 +111,6 @@ func TestFetchTickets_APIError(t *testing.T) {
 		domain: server.URL,
 		email:  "user@test.com",
 		token:  "bad-token",
-		jql:    "project = X",
 		http:   server.Client(),
 	}
 
@@ -133,7 +131,6 @@ func TestFetchTickets_EmptyResponse(t *testing.T) {
 		domain: server.URL,
 		email:  "user@test.com",
 		token:  "token",
-		jql:    "project = X",
 		http:   server.Client(),
 	}
 

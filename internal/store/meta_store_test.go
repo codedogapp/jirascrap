@@ -35,60 +35,81 @@ func setupTestDB(t *testing.T) *SqliteMetaStore {
 
 // --- Tags ---
 
-func TestSaveMeta_AndGetAllMeta(t *testing.T) {
+func TestSaveMeta_TagsJoinedInGetCachedTickets(t *testing.T) {
 	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
 
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
 	if err := s.SaveMeta("TICK-1", []string{"bug", "urgent"}); err != nil {
 		t.Fatalf("SaveMeta: %v", err)
 	}
 
-	meta, err := s.GetAllMeta()
+	tickets, err := s.GetCachedTickets()
 	if err != nil {
-		t.Fatalf("GetAllMeta: %v", err)
+		t.Fatalf("GetCachedTickets: %v", err)
 	}
-	if len(meta) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(meta))
+	if len(tickets) != 1 {
+		t.Fatalf("expected 1 ticket, got %d", len(tickets))
 	}
-	tags := meta["TICK-1"].Tags
-	if len(tags) != 2 || tags[0] != "bug" || tags[1] != "urgent" {
-		t.Errorf("tags = %v, want [bug urgent]", tags)
+	if len(tickets[0].Tags) != 2 {
+		t.Errorf("tags = %v, want [bug urgent]", tickets[0].Tags)
 	}
 }
 
 func TestSaveMeta_Overwrite(t *testing.T) {
 	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
 
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
 	_ = s.SaveMeta("TICK-1", []string{"old-tag"})
 	_ = s.SaveMeta("TICK-1", []string{"new-tag"})
 
-	meta, _ := s.GetAllMeta()
-	tags := meta["TICK-1"].Tags
-	if len(tags) != 1 || tags[0] != "new-tag" {
-		t.Errorf("tags = %v, want [new-tag]", tags)
+	tickets, _ := s.GetCachedTickets()
+	if len(tickets[0].Tags) != 1 || tickets[0].Tags[0] != "new-tag" {
+		t.Errorf("tags = %v, want [new-tag]", tickets[0].Tags)
 	}
 }
 
 func TestSaveMeta_EmptyTags(t *testing.T) {
 	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
 
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
 	_ = s.SaveMeta("TICK-1", []string{"tag"})
 	_ = s.SaveMeta("TICK-1", []string{})
 
-	meta, _ := s.GetAllMeta()
-	if _, ok := meta["TICK-1"]; ok {
-		t.Error("expected TICK-1 to have no entry after clearing tags")
+	tickets, _ := s.GetCachedTickets()
+	if tickets[0].Tags != nil {
+		t.Errorf("tags = %v, want nil", tickets[0].Tags)
 	}
 }
 
 func TestSaveMeta_MultipleTickets(t *testing.T) {
 	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
 
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
+		{ID: "TICK-2", Summary: "Second", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
 	_ = s.SaveMeta("TICK-1", []string{"a"})
 	_ = s.SaveMeta("TICK-2", []string{"b", "c"})
 
-	meta, _ := s.GetAllMeta()
-	if len(meta) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(meta))
+	tickets, _ := s.GetCachedTickets()
+	tagged := 0
+	for _, t := range tickets {
+		if len(t.Tags) > 0 {
+			tagged++
+		}
+	}
+	if tagged != 2 {
+		t.Fatalf("expected 2 tagged tickets, got %d", tagged)
 	}
 }
 
@@ -318,16 +339,178 @@ func TestCacheTickets_PreservesLocalMeta(t *testing.T) {
 	s := setupTestDB(t)
 	now := time.Now().Truncate(time.Second)
 
-	// Save tags for a ticket
 	_ = s.SaveMeta("TICK-1", []string{"important"})
 
 	// Cache tickets, then clear cache (ticket removed from Jira)
-	_ = s.CacheTickets([]model.Ticket{{ID: "TICK-1", Summary: "x", CreatedAt: now, UpdatedAt: now}})
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "TICK-1", Summary: "x", CreatedAt: now, UpdatedAt: now},
+	})
 	_ = s.CacheTickets([]model.Ticket{})
 
-	// Tags should still be preserved
-	meta, _ := s.GetAllMeta()
-	if tags := meta["TICK-1"].Tags; len(tags) != 1 || tags[0] != "important" {
+	// Tags in issue_tags should survive ticket cache clear
+	tags, _ := s.GetUniqueTags()
+	if len(tags) != 1 || tags[0] != "important" {
 		t.Errorf("expected tags preserved, got %v", tags)
+	}
+}
+
+// --- Epic Children ---
+
+func TestCacheEpicChildren_AndGetAll(t *testing.T) {
+	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
+
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "EPIC-1", Summary: "My Epic", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+	})
+
+	children := []model.Ticket{
+		{
+			ID:             "CHILD-1",
+			Summary:        "First child",
+			Reporter:       "Alice",
+			Status:         "Open",
+			StatusCategory: "To Do",
+			Priority:       "High",
+			Type:           "Task",
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		},
+		{
+			ID:             "CHILD-2",
+			Summary:        "Second child",
+			Reporter:       "Bob",
+			Status:         "Done",
+			StatusCategory: "Done",
+			Priority:       "Low",
+			Type:           "Task",
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		},
+	}
+
+	if err := s.CacheEpicChildren("EPIC-1", children); err != nil {
+		t.Fatalf("CacheEpicChildren: %v", err)
+	}
+
+	got, err := s.GetAllCachedEpicChildren()
+	if err != nil {
+		t.Fatalf("GetAllCachedEpicChildren: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 epic, got %d", len(got))
+	}
+	if len(got["EPIC-1"]) != 2 {
+		t.Fatalf("expected 2 children, got %d", len(got["EPIC-1"]))
+	}
+	if got["EPIC-1"][0].EpicID != "EPIC-1" {
+		t.Errorf("child EpicID = %q, want EPIC-1", got["EPIC-1"][0].EpicID)
+	}
+}
+
+func TestCacheEpicChildren_ReplacesPerEpic(t *testing.T) {
+	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
+
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "EPIC-1", Summary: "Epic 1", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+		{ID: "EPIC-2", Summary: "Epic 2", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+	})
+
+	_ = s.CacheEpicChildren("EPIC-1", []model.Ticket{
+		{ID: "OLD-1", Summary: "old", CreatedAt: now, UpdatedAt: now},
+	})
+	_ = s.CacheEpicChildren("EPIC-2", []model.Ticket{
+		{ID: "OTHER-1", Summary: "other", CreatedAt: now, UpdatedAt: now},
+	})
+	// Replace only EPIC-1's children
+	_ = s.CacheEpicChildren("EPIC-1", []model.Ticket{
+		{ID: "NEW-1", Summary: "new", CreatedAt: now, UpdatedAt: now},
+	})
+
+	got, _ := s.GetAllCachedEpicChildren()
+	if len(got["EPIC-1"]) != 1 || got["EPIC-1"][0].ID != "NEW-1" {
+		t.Errorf("EPIC-1 children = %+v, want [NEW-1]", got["EPIC-1"])
+	}
+	if len(got["EPIC-2"]) != 1 || got["EPIC-2"][0].ID != "OTHER-1" {
+		t.Errorf("EPIC-2 should be unchanged, got %+v", got["EPIC-2"])
+	}
+}
+
+func TestCacheEpicChildren_SeparateFromMainTickets(t *testing.T) {
+	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
+
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "EPIC-1", Summary: "An epic", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+		{ID: "TASK-1", Summary: "A task", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
+	_ = s.CacheEpicChildren("EPIC-1", []model.Ticket{
+		{ID: "CHILD-1", Summary: "child", CreatedAt: now, UpdatedAt: now},
+	})
+
+	// Main list should only have epic + top-level task, not children
+	tickets, _ := s.GetCachedTickets()
+	if len(tickets) != 2 {
+		t.Fatalf("expected 2 main tickets, got %d", len(tickets))
+	}
+	ids := map[string]bool{}
+	for _, t := range tickets {
+		ids[t.ID] = true
+	}
+	if !ids["EPIC-1"] || !ids["TASK-1"] {
+		t.Errorf("main list should contain EPIC-1 and TASK-1, got %v", ids)
+	}
+	if ids["CHILD-1"] {
+		t.Error("CHILD-1 should not appear in main list")
+	}
+}
+
+func TestGetCachedTickets_EpicsHaveIsEpicFlag(t *testing.T) {
+	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
+
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "EPIC-1", Summary: "an epic", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+		{ID: "TASK-1", Summary: "a task", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
+
+	got, _ := s.GetCachedTickets()
+	epicFound, taskFound := false, false
+	for _, t := range got {
+		if t.ID == "EPIC-1" && t.IsEpic() {
+			epicFound = true
+		}
+		if t.ID == "TASK-1" && !t.IsEpic() {
+			taskFound = true
+		}
+	}
+	if !epicFound {
+		t.Error("EPIC-1 should have IsEpic()=true")
+	}
+	if !taskFound {
+		t.Error("TASK-1 should have IsEpic()=false")
+	}
+}
+
+func TestCacheTickets_PreservesEpicChildren(t *testing.T) {
+	s := setupTestDB(t)
+	now := time.Now().Truncate(time.Second)
+
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "EPIC-1", Summary: "epic", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+	})
+	_ = s.CacheEpicChildren("EPIC-1", []model.Ticket{
+		{ID: "CHILD-1", Summary: "child", Type: "Task", CreatedAt: now, UpdatedAt: now},
+	})
+
+	// Re-cache tickets (simulating a sync) — children should survive
+	_ = s.CacheTickets([]model.Ticket{
+		{ID: "EPIC-1", Summary: "epic updated", Type: "Epic", CreatedAt: now, UpdatedAt: now},
+	})
+
+	children, _ := s.GetAllCachedEpicChildren()
+	if len(children["EPIC-1"]) != 1 || children["EPIC-1"][0].ID != "CHILD-1" {
+		t.Errorf("epic children should survive re-cache, got %+v", children["EPIC-1"])
 	}
 }

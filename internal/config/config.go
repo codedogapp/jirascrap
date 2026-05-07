@@ -11,7 +11,6 @@ type Config struct {
 	Domain   string
 	Email    string
 	APIToken string
-	JQL      string
 	DBPath   string
 }
 
@@ -20,15 +19,11 @@ func Load() (*Config, error) {
 		Domain:   os.Getenv("JIRA_BASE_URL"),
 		Email:    os.Getenv("JIRA_EMAIL"),
 		APIToken: os.Getenv("JIRA_API_TOKEN"),
-		JQL:      os.Getenv("JIRA_JQL"),
 		DBPath:   os.Getenv("JIRA_DB_PATH"),
 	}
 
 	if cfg.DBPath == "" {
 		cfg.DBPath = "./data/jira.db"
-	}
-	if cfg.JQL == "" {
-		cfg.JQL = "assignee = currentUser() ORDER BY updated DESC"
 	}
 
 	var errs []string
