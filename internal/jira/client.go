@@ -140,8 +140,10 @@ func (c *Client) FetchAllEpicChildren(tickets []model.Ticket) (map[string][]mode
 	var firstErr error
 	for range epics {
 		r := <-ch
-		if r.err != nil && firstErr == nil {
-			firstErr = r.err
+		if r.err != nil {
+			if firstErr == nil {
+				firstErr = r.err
+			}
 			continue
 		}
 		out[r.epicKey] = r.children

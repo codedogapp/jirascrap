@@ -186,7 +186,7 @@ func (s *SqliteMetaStore) CacheTickets(tickets []model.Ticket) error {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM ticket_cache WHERE epic_key IS NULL`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM ticket_cache`); err != nil {
 		return err
 	}
 
@@ -194,7 +194,7 @@ func (s *SqliteMetaStore) CacheTickets(tickets []model.Ticket) error {
 		return tx.Commit()
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO ticket_cache (id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO ticket_cache (id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (s *SqliteMetaStore) CacheTickets(tickets []model.Ticket) error {
 }
 
 func (s *SqliteMetaStore) GetCachedTickets() ([]model.Ticket, error) {
-	rows, err := s.db.Query(`SELECT id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown FROM ticket_cache WHERE epic_key IS NULL`)
+	rows, err := s.db.Query(`SELECT id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown FROM ticket_cache`)
 	if err != nil {
 		return nil, err
 	}
@@ -239,12 +239,12 @@ func (s *SqliteMetaStore) CacheEpicChildren(epicKey string, tickets []model.Tick
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM ticket_cache WHERE epic_key = ?`, epicKey); err != nil {
+	if _, err := tx.Exec(`DELETE FROM epic_children WHERE epic_key = ?`, epicKey); err != nil {
 		return err
 	}
 
 	if len(tickets) > 0 {
-		stmt, err := tx.Prepare(`INSERT OR REPLACE INTO ticket_cache (epic_key, id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		stmt, err := tx.Prepare(`INSERT INTO epic_children (epic_key, id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 		if err != nil {
 			return err
 		}
@@ -262,7 +262,7 @@ func (s *SqliteMetaStore) CacheEpicChildren(epicKey string, tickets []model.Tick
 }
 
 func (s *SqliteMetaStore) GetAllCachedEpicChildren() (map[string][]model.Ticket, error) {
-	rows, err := s.db.Query(`SELECT epic_key, id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown FROM ticket_cache WHERE epic_key IS NOT NULL ORDER BY epic_key, rowid`)
+	rows, err := s.db.Query(`SELECT epic_key, id, summary, reporter, status, status_category, priority, is_epic, created_at, updated_at, markdown FROM epic_children ORDER BY epic_key, rowid`)
 	if err != nil {
 		return nil, err
 	}
@@ -271,10 +271,15 @@ func (s *SqliteMetaStore) GetAllCachedEpicChildren() (map[string][]model.Ticket,
 	result := make(map[string][]model.Ticket)
 	for rows.Next() {
 		var epicKey string
-		t, err := scanTicketWithPrefix(rows, &epicKey)
-		if err != nil {
+		var t model.Ticket
+		var createdAt, updatedAt string
+		var isEpic int
+		if err := rows.Scan(&epicKey, &t.ID, &t.Summary, &t.Reporter, &t.Status, &t.StatusCategory, &t.Priority, &isEpic, &createdAt, &updatedAt, &t.Markdown); err != nil {
 			return nil, err
 		}
+		t.IsEpic = isEpic != 0
+		t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		t.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 		result[epicKey] = append(result[epicKey], t)
 	}
 
@@ -296,19 +301,6 @@ func scanTicket(row rowScanner) (model.Ticket, error) {
 	var createdAt, updatedAt string
 	var isEpic int
 	if err := row.Scan(&t.ID, &t.Summary, &t.Reporter, &t.Status, &t.StatusCategory, &t.Priority, &isEpic, &createdAt, &updatedAt, &t.Markdown); err != nil {
-		return model.Ticket{}, err
-	}
-	t.IsEpic = isEpic != 0
-	t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-	t.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
-	return t, nil
-}
-
-func scanTicketWithPrefix(row rowScanner, prefix *string) (model.Ticket, error) {
-	var t model.Ticket
-	var createdAt, updatedAt string
-	var isEpic int
-	if err := row.Scan(prefix, &t.ID, &t.Summary, &t.Reporter, &t.Status, &t.StatusCategory, &t.Priority, &isEpic, &createdAt, &updatedAt, &t.Markdown); err != nil {
 		return model.Ticket{}, err
 	}
 	t.IsEpic = isEpic != 0

@@ -247,7 +247,7 @@ func styleEpicBolt(isEpic bool, sb *strings.Builder) {
 	if !isEpic {
 		return
 	}
-	sb.WriteString(epicBoltStyle.Render("⚡ "))
+	sb.WriteString(epicBoltStyle.Render("⚡"))
 }
 
 var tagsStyle = lipgloss.NewStyle().
