@@ -16,4 +16,5 @@ type Ticket struct {
 	Tags           []string
 	Priority       string
 	IsEpic         bool
+	EpicID         string // optional, links ticket to parent epic
 }
