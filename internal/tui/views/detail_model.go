@@ -172,7 +172,8 @@ func getContent(ticket model.Ticket, width int) string {
 	return rendered
 }
 
-// STYLES
+// --------- Styles Helpers ---------
+
 func styleStatus(statusCategory string, status string, sb *strings.Builder) {
 	statusC := statusColor(statusCategory)
 	rendered := lipgloss.NewStyle().

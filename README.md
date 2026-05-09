@@ -29,6 +29,8 @@ Set these environment variables before running:
 | `JIRA_EMAIL` | Yes | Email associated with your Atlassian account |
 | `JIRA_API_TOKEN` | Yes | API token from [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
 | `JIRA_DB_PATH` | No | Path to SQLite database file (default: `./data/jira.db`) |
+| `JIRASCRAP_COPILOT_WORKSPACE` | No | Directory where Copilot CLI launches (default: current working directory) |
+| `JIRASCRAP_COPILOT_MODEL` | No | AI model for initial planning (default: `claude-haiku-4.5`) |
 
 ## Usage
 
@@ -46,6 +48,7 @@ jirascrap
 | `n` | Open todo list |
 | `r` | Refresh tickets from Jira |
 | `d` | Toggle debug overlay |
+| `c` | Send ticket to Copilot CLI (tmux) |
 | `?` | Toggle full help |
 | `q` | Quit |
 | `ctrl+c` | Force quit |
@@ -76,6 +79,25 @@ On startup, jirascrap loads any cached tickets from the local SQLite database an
 Tags and todos are stored locally and are preserved even if a ticket is removed from your Jira query results.
 
 Press `r` at any time to manually sync with Jira.
+
+## Copilot CLI Integration
+
+Press `c` on any ticket to launch [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli) in a tmux session with full ticket context.
+
+**How it works:**
+- A single tmux session named `copilot` is created (or reused)
+- Each ticket gets its own pane, identified by ticket ID
+- Copilot starts in plan mode with a cheap model and the ticket context as the initial prompt
+- The TUI stays running — switch to the copilot session with `tmux attach -t copilot`
+
+**Requirements:** `tmux` and `copilot` must be in your PATH.
+
+**Configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JIRASCRAP_COPILOT_WORKSPACE` | Current directory | Working directory for Copilot |
+| `JIRASCRAP_COPILOT_MODEL` | `claude-haiku-4.5` | Model for initial planning |
 
 ## Development
 

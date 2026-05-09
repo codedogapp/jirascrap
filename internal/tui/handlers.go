@@ -62,6 +62,7 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 
 	m.tagModel.SetSize(contentWidth, contentHeight)
 	m.todoModel.SetSize(contentWidth, contentHeight)
+	m.toastModel.SetSize(msg.Width, msg.Height)
 
 	return m, nil
 }
@@ -426,7 +427,7 @@ func (m *AppModel) handleOpenInBrowser(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	domain := strings.TrimRight(m.domain, "/")
+	domain := strings.TrimRight(m.config.Domain, "/")
 	ticketURL := fmt.Sprintf("%s/browse/%s", domain, ticket.ID)
 
 	return true, func() tea.Msg {
