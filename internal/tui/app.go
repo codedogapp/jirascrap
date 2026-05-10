@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/codedogapp/jirascrap/internal/config"
 	"github.com/codedogapp/jirascrap/internal/jira"
 	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/store"
@@ -15,7 +16,7 @@ type AppModel struct {
 	// Dependencies
 	jiraClient *jira.Client
 	store      store.MetaStore
-	domain     string
+	config     *config.Config
 
 	// State
 	list         *views.ListModel
@@ -24,6 +25,7 @@ type AppModel struct {
 	debugModel   *views.DebugModel
 	tagModel     *views.TagModel
 	todoModel    *views.TodoModel
+	toastModel   *views.ToastModel
 	epicChildren map[string][]model.Ticket
 	err          error
 	syncing      bool
@@ -34,19 +36,20 @@ type AppModel struct {
 	height int
 }
 
-func NewApp(client *jira.Client, s store.MetaStore, domain string) *AppModel {
+func NewApp(client *jira.Client, s store.MetaStore, cfg *config.Config) *AppModel {
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
 	return &AppModel{
 		jiraClient:   client,
 		store:        s,
-		domain:       domain,
+		config:       cfg,
 		list:         listModel,
 		activeModel:  listModel,
 		debugModel:   debugModel,
 		tagModel:     views.NewTagModel(0, 0, nil),
 		todoModel:    views.NewTodoModel(0, 0, "", nil),
+		toastModel:   views.NewToastModel(0, 0),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 	}
@@ -100,6 +103,13 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tagSavedMsg:
 		return m.handleTagSaved(msg)
 
+	case copilotLaunchedMsg:
+		return m.handleCopilotLaunched(msg)
+
+	case views.ToastTimeoutMsg:
+		m.toastModel.Hide()
+		return m, nil
+
 	case tea.KeyPressMsg:
 		cmd := m.handleQuit(msg)
 		if cmd != nil {
@@ -133,6 +143,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if consumed, cmd := m.handleToggleTodo(msg); consumed {
 			return m, cmd
 		}
+		if consumed, cmd := m.handleSendToCopilot(msg); consumed {
+			return m, cmd
+		}
 		m.activeModel, cmd = m.activeModel.Update(msg)
 		return m, cmd
 
@@ -162,8 +175,9 @@ func (m *AppModel) View() tea.View {
 	debug := m.debugModel.View()
 	todoOverlay := m.todoModel.View()
 	tagOverlay := m.tagModel.View()
+	toastOverlay := m.toastModel.View()
 
-	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil
+	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil || toastOverlay != nil
 	if hasOverlay {
 		layers := []*lipgloss.Layer{lipgloss.NewLayer(base)}
 		if todoOverlay != nil {
@@ -175,6 +189,9 @@ func (m *AppModel) View() tea.View {
 		if debug != nil {
 			layers = append(layers, debug)
 		}
+		if toastOverlay != nil {
+			layers = append(layers, toastOverlay)
+		}
 		v := tea.NewView(lipgloss.NewCompositor(layers...).Render())
 		v.AltScreen = true
 		return v
@@ -185,8 +202,8 @@ func (m *AppModel) View() tea.View {
 	return v
 }
 
-func Run(client *jira.Client, s store.MetaStore, domain string) error {
-	app := NewApp(client, s, domain)
+func Run(client *jira.Client, s store.MetaStore, cfg *config.Config) error {
+	app := NewApp(client, s, cfg)
 	p := tea.NewProgram(app)
 	_, err := p.Run()
 	if err != nil {

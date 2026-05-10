@@ -4,26 +4,49 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 type Config struct {
-	Domain   string
-	Email    string
-	APIToken string
-	DBPath   string
+	Domain           string
+	Email            string
+	APIToken         string
+	DBPath           string
+	CopilotWorkspace string
+	CopilotModel     string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Domain:   os.Getenv("JIRA_BASE_URL"),
-		Email:    os.Getenv("JIRA_EMAIL"),
-		APIToken: os.Getenv("JIRA_API_TOKEN"),
-		DBPath:   os.Getenv("JIRA_DB_PATH"),
+		Domain:           os.Getenv("JIRA_BASE_URL"),
+		Email:            os.Getenv("JIRA_EMAIL"),
+		APIToken:         os.Getenv("JIRA_API_TOKEN"),
+		DBPath:           os.Getenv("JIRA_DB_PATH"),
+		CopilotWorkspace: os.Getenv("JIRASCRAP_COPILOT_WORKSPACE"),
+		CopilotModel:     os.Getenv("JIRASCRAP_COPILOT_MODEL"),
 	}
 
 	if cfg.DBPath == "" {
 		cfg.DBPath = "./data/jira.db"
+	}
+
+	if cfg.CopilotWorkspace == "" {
+		cwd, _ := os.Getwd()
+		cfg.CopilotWorkspace = cwd
+	}
+
+	// Expand ~ and resolve to absolute path for tmux compatibility
+	if strings.HasPrefix(cfg.CopilotWorkspace, "~/") {
+		home, _ := os.UserHomeDir()
+		cfg.CopilotWorkspace = filepath.Join(home, cfg.CopilotWorkspace[2:])
+	}
+	if abs, err := filepath.Abs(cfg.CopilotWorkspace); err == nil {
+		cfg.CopilotWorkspace = abs
+	}
+
+	if cfg.CopilotModel == "" {
+		cfg.CopilotModel = "claude-haiku-4.5"
 	}
 
 	var errs []string

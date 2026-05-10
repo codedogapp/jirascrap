@@ -31,3 +31,8 @@ type epicChildrenLoadedMsg struct {
 type epicChildrenErrorMsg struct {
 	err error
 }
+
+type copilotLaunchedMsg struct {
+	ticketID string
+	err      error
+}
