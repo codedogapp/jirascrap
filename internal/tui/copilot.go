@@ -61,6 +61,11 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 		}
 
 		// Launch copilot
+		cdCmd := fmt.Sprintf("cd %s", workspace)
+		if err := copilotSession.SendKeys(windowID, cdCmd); err != nil {
+			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("cd to workspace: %w", err)}
+		}
+
 		cmd := fmt.Sprintf(
 			"copilot --plan --model %s --allow-all-paths -i \"$(cat '%s')\"",
 			copilotModel, promptPath,
