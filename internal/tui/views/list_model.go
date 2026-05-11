@@ -45,6 +45,7 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 		return []key.Binding{
 			keymaps.DefaultKeyMap.ToggleTagging,
 			keymaps.DefaultKeyMap.ToggleTodo,
+			keymaps.DefaultKeyMap.ToggleStatus,
 			keymaps.DefaultKeyMap.OpenInBrowser,
 			keymaps.DefaultKeyMap.SendToCopilot,
 		}
@@ -53,6 +54,7 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 		return []key.Binding{
 			keymaps.DefaultKeyMap.ToggleTagging,
 			keymaps.DefaultKeyMap.ToggleTodo,
+			keymaps.DefaultKeyMap.ToggleStatus,
 			keymaps.DefaultKeyMap.OpenInBrowser,
 			keymaps.DefaultKeyMap.SendToCopilot,
 			keymaps.DefaultKeyMap.ToggleDebug,

@@ -142,3 +142,132 @@ func TestFetchTickets_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 tickets, got %d", len(tickets))
 	}
 }
+
+func TestFetchTransitions_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/rest/api/3/issue/PROJ-1/transitions" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "test@example.com" || pass != "test-token" {
+			t.Errorf("auth: user=%q pass=%q ok=%v", user, pass, ok)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"transitions": [
+				{
+					"id": "21",
+					"name": "Done",
+					"to": {"name": "Done", "statusCategory": {"name": "Done"}}
+				},
+				{
+					"id": "31",
+					"name": "In Progress",
+					"to": {"name": "In Progress", "statusCategory": {"name": "In Progress"}}
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain: server.URL,
+		email:  "test@example.com",
+		token:  "test-token",
+		http:   server.Client(),
+	}
+
+	transitions, err := client.FetchTransitions("PROJ-1")
+	if err != nil {
+		t.Fatalf("FetchTransitions: %v", err)
+	}
+	if len(transitions) != 2 {
+		t.Fatalf("expected 2 transitions, got %d", len(transitions))
+	}
+
+	if transitions[0].ID != "21" || transitions[0].Name != "Done" {
+		t.Errorf("transition[0] = %+v", transitions[0])
+	}
+	if transitions[0].ToStatus != "Done" || transitions[0].ToStatusCategory != "Done" {
+		t.Errorf("transition[0] to = %q / %q", transitions[0].ToStatus, transitions[0].ToStatusCategory)
+	}
+	if transitions[1].ID != "31" || transitions[1].Name != "In Progress" {
+		t.Errorf("transition[1] = %+v", transitions[1])
+	}
+}
+
+func TestFetchTransitions_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errorMessages":["Issue not found"]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain: server.URL,
+		email:  "user@test.com",
+		token:  "token",
+		http:   server.Client(),
+	}
+
+	_, err := client.FetchTransitions("BAD-1")
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+}
+
+func TestDoTransition_Success(t *testing.T) {
+	var receivedBody transitionRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		if r.URL.Path != "/rest/api/3/issue/PROJ-1/transitions" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+
+		json.NewDecoder(r.Body).Decode(&receivedBody)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain: server.URL,
+		email:  "test@example.com",
+		token:  "test-token",
+		http:   server.Client(),
+	}
+
+	err := client.DoTransition("PROJ-1", "21")
+	if err != nil {
+		t.Fatalf("DoTransition: %v", err)
+	}
+	if receivedBody.Transition.ID != "21" {
+		t.Errorf("transition ID = %q, want 21", receivedBody.Transition.ID)
+	}
+}
+
+func TestDoTransition_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"errorMessages":["Invalid transition"]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain: server.URL,
+		email:  "user@test.com",
+		token:  "token",
+		http:   server.Client(),
+	}
+
+	err := client.DoTransition("PROJ-1", "999")
+	if err == nil {
+		t.Fatal("expected error for 400 response")
+	}
+}

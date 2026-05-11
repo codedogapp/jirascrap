@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/codedogapp/jirascrap/internal/jira"
 	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
@@ -62,6 +63,7 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 
 	m.tagModel.SetSize(contentWidth, contentHeight)
 	m.todoModel.SetSize(contentWidth, contentHeight)
+	m.statusModel.SetSize(contentWidth, contentHeight)
 	m.toastModel.SetSize(msg.Width, msg.Height)
 
 	return m, nil
@@ -325,7 +327,7 @@ func (m *AppModel) handleRefresh(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 }
 
 func (m *AppModel) isPopupActive() bool {
-	return m.tagModel.IsVisible() || m.todoModel.IsVisible()
+	return m.tagModel.IsVisible() || m.todoModel.IsVisible() || m.statusModel.IsVisible()
 }
 
 func (m *AppModel) selectedTicket() (model.Ticket, bool) {
@@ -454,5 +456,116 @@ func (m *AppModel) saveTodosCmd(ticketID string, todos []model.Todo) tea.Cmd {
 			return views.ErrMsg{Err: err}
 		}
 		return todoSavedMsg{}
+	}
+}
+
+func (m *AppModel) handleToggleStatus(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if !key.Matches(msg, keymaps.DefaultKeyMap.ToggleStatus) {
+		return false, nil
+	}
+
+	ticket, ok := m.withSelectedTicket()
+	if !ok {
+		return false, nil
+	}
+
+	m.statusModel.Show(ticket)
+	return true, m.fetchTransitionsCmd(ticket.ID)
+}
+
+func (m *AppModel) fetchTransitionsCmd(issueKey string) tea.Cmd {
+	return func() tea.Msg {
+		transitions, err := m.jiraClient.FetchTransitions(issueKey)
+		if err != nil {
+			return transitionsErrorMsg{err: err}
+		}
+		return transitionsLoadedMsg{ticketID: issueKey, transitions: transitions}
+	}
+}
+
+func (m *AppModel) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, keymaps.DefaultKeyMap.GoBack) {
+		m.statusModel.Hide()
+		return m, nil
+	}
+
+	return m, m.statusModel.Update(msg)
+}
+
+func (m *AppModel) handleTransitionsLoaded(msg transitionsLoadedMsg) (tea.Model, tea.Cmd) {
+	m.statusModel.SetTransitions(msg.transitions)
+	return m, nil
+}
+
+func (m *AppModel) handleStatusTransition(msg views.StatusTransitionMsg) (tea.Model, tea.Cmd) {
+	return m, m.doTransitionCmd(msg.TicketID, msg.Transition)
+}
+
+func (m *AppModel) doTransitionCmd(issueKey string, transition jira.Transition) tea.Cmd {
+	return func() tea.Msg {
+		err := m.jiraClient.DoTransition(issueKey, transition.ID)
+		if err != nil {
+			return statusTransitionErrorMsg{err: err}
+		}
+		return statusTransitionCompleteMsg{
+			ticketID:          issueKey,
+			newStatus:         transition.ToStatus,
+			newStatusCategory: transition.ToStatusCategory,
+		}
+	}
+}
+
+func (m *AppModel) handleStatusTransitionComplete(msg statusTransitionCompleteMsg) (tea.Model, tea.Cmd) {
+	m.updateTicketStatus(msg.ticketID, msg.newStatus, msg.newStatusCategory)
+
+	toastCmd := m.toastModel.Show(fmt.Sprintf("→ %s", msg.newStatus))
+
+	return m, tea.Batch(toastCmd, m.syncFromJira())
+}
+
+// updateTicketStatus updates ticket status in-memory across main list, epic children, and detail view.
+func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory string) {
+	update := func(tickets []model.Ticket) []model.Ticket {
+		for i := range tickets {
+			if tickets[i].ID == ticketID {
+				tickets[i].Status = newStatus
+				tickets[i].StatusCategory = newStatusCategory
+			}
+		}
+		return tickets
+	}
+
+	if root := m.rootList(); root != nil {
+		if t, ok := root.FindTicket(ticketID); ok {
+			t.Status = newStatus
+			t.StatusCategory = newStatusCategory
+			tickets, _ := m.store.GetCachedTickets()
+			update(tickets)
+			root.SetItems(tickets)
+		}
+	}
+
+	for epicKey, children := range m.epicChildren {
+		m.epicChildren[epicKey] = update(children)
+	}
+
+	// Update current epic list view if inside one
+	if m.previousList != nil {
+		for epicKey, children := range m.epicChildren {
+			if strings.HasPrefix(m.list.Title(), fmt.Sprintf("⚡ %s", epicKey)) {
+				m.list.SetItems(children)
+				break
+			}
+		}
+	}
+
+	// Update detail view if showing this ticket
+	if dm, ok := m.activeModel.(*views.DetailModel); ok {
+		if dm.Ticket().ID == ticketID {
+			ticket := dm.Ticket()
+			ticket.Status = newStatus
+			ticket.StatusCategory = newStatusCategory
+			dm.UpdateTags(ticket)
+		}
 	}
 }

@@ -13,6 +13,7 @@ type KeyMap struct {
 	Select         key.Binding
 	ToggleTagging  key.Binding
 	ToggleTodo     key.Binding
+	ToggleStatus   key.Binding
 	ToggleDebug    key.Binding
 	Refresh        key.Binding
 	ToggleHelp     key.Binding
@@ -59,6 +60,11 @@ func newKeyMap() *KeyMap {
 		ToggleTodo: key.NewBinding(
 			key.WithKeys("n"),
 			key.WithHelp("n", "todo"),
+		),
+
+		ToggleStatus: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "status"),
 		),
 
 		ToggleDebug: key.NewBinding(
@@ -108,7 +114,7 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
-		{k.ToggleTagging, k.ToggleTodo, k.OpenInBrowser, k.SendToCopilot},
+		{k.ToggleTagging, k.ToggleTodo, k.ToggleStatus, k.OpenInBrowser, k.SendToCopilot},
 		{k.GoBack, k.GoHome, k.Quit, k.ToggleDebug, k.Refresh},
 	}
 }
@@ -184,6 +190,36 @@ func newTodoKeyMap() *TodoKeyMap {
 		Cancel: key.NewBinding(
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "close"),
+		),
+	}
+}
+
+type StatusKeyMap struct {
+	Next    key.Binding
+	Prev    key.Binding
+	Confirm key.Binding
+	Cancel  key.Binding
+}
+
+var DefaultStatusKeyMap = newStatusKeyMap()
+
+func newStatusKeyMap() *StatusKeyMap {
+	return &StatusKeyMap{
+		Next: key.NewBinding(
+			key.WithKeys("down", "j"),
+			key.WithHelp("↓", "next"),
+		),
+		Prev: key.NewBinding(
+			key.WithKeys("up", "k"),
+			key.WithHelp("↑", "prev"),
+		),
+		Confirm: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "transition"),
+		),
+		Cancel: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "cancel"),
 		),
 	}
 }

@@ -25,6 +25,7 @@ type AppModel struct {
 	debugModel   *views.DebugModel
 	tagModel     *views.TagModel
 	todoModel    *views.TodoModel
+	statusModel  *views.StatusModel
 	toastModel   *views.ToastModel
 	epicChildren map[string][]model.Ticket
 	err          error
@@ -49,6 +50,7 @@ func NewApp(client *jira.Client, s store.MetaStore, cfg *config.Config) *AppMode
 		debugModel:   debugModel,
 		tagModel:     views.NewTagModel(0, 0, nil),
 		todoModel:    views.NewTodoModel(0, 0, "", nil),
+		statusModel:  views.NewStatusModel(0, 0),
 		toastModel:   views.NewToastModel(0, 0),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
@@ -106,6 +108,22 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case copilotLaunchedMsg:
 		return m.handleCopilotLaunched(msg)
 
+	case transitionsLoadedMsg:
+		return m.handleTransitionsLoaded(msg)
+
+	case transitionsErrorMsg:
+		m.statusModel.Hide()
+		return m.handleError(views.ErrMsg{Err: msg.err})
+
+	case views.StatusTransitionMsg:
+		return m.handleStatusTransition(msg)
+
+	case statusTransitionCompleteMsg:
+		return m.handleStatusTransitionComplete(msg)
+
+	case statusTransitionErrorMsg:
+		return m.handleError(views.ErrMsg{Err: msg.err})
+
 	case views.ToastTimeoutMsg:
 		m.toastModel.Hide()
 		return m, nil
@@ -125,6 +143,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.todoModel.IsVisible() {
 			return m.handleTodoKey(msg)
 		}
+		if m.statusModel.IsVisible() {
+			return m.handleStatusKey(msg)
+		}
 		if consumed, cmd := m.handleRefresh(msg); consumed {
 			return m, cmd
 		}
@@ -141,6 +162,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		if consumed, cmd := m.handleToggleTodo(msg); consumed {
+			return m, cmd
+		}
+		if consumed, cmd := m.handleToggleStatus(msg); consumed {
 			return m, cmd
 		}
 		if consumed, cmd := m.handleSendToCopilot(msg); consumed {
@@ -175,9 +199,10 @@ func (m *AppModel) View() tea.View {
 	debug := m.debugModel.View()
 	todoOverlay := m.todoModel.View()
 	tagOverlay := m.tagModel.View()
+	statusOverlay := m.statusModel.View()
 	toastOverlay := m.toastModel.View()
 
-	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil || toastOverlay != nil
+	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil || statusOverlay != nil || toastOverlay != nil
 	if hasOverlay {
 		layers := []*lipgloss.Layer{lipgloss.NewLayer(base)}
 		if todoOverlay != nil {
@@ -185,6 +210,9 @@ func (m *AppModel) View() tea.View {
 		}
 		if tagOverlay != nil {
 			layers = append(layers, tagOverlay)
+		}
+		if statusOverlay != nil {
+			layers = append(layers, statusOverlay)
 		}
 		if debug != nil {
 			layers = append(layers, debug)

@@ -1,6 +1,9 @@
 package tui
 
-import "github.com/codedogapp/jirascrap/internal/model"
+import (
+	"github.com/codedogapp/jirascrap/internal/jira"
+	"github.com/codedogapp/jirascrap/internal/model"
+)
 
 type cachedTicketsLoadedMsg struct {
 	tickets      []model.Ticket
@@ -35,4 +38,23 @@ type epicChildrenErrorMsg struct {
 type copilotLaunchedMsg struct {
 	ticketID string
 	err      error
+}
+
+type transitionsLoadedMsg struct {
+	ticketID    string
+	transitions []jira.Transition
+}
+
+type transitionsErrorMsg struct {
+	err error
+}
+
+type statusTransitionCompleteMsg struct {
+	ticketID          string
+	newStatus         string
+	newStatusCategory string
+}
+
+type statusTransitionErrorMsg struct {
+	err error
 }
