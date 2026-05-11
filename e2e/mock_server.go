@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type response struct {
@@ -116,6 +117,60 @@ var data = response{
 	},
 }
 
+type transitionsResponse struct {
+	Transitions []transition `json:"transitions"`
+}
+
+type transition struct {
+	ID   string         `json:"id"`
+	Name string         `json:"name"`
+	To   transitionTo   `json:"to"`
+}
+
+type transitionTo struct {
+	Name           string `json:"name"`
+	StatusCategory named  `json:"statusCategory"`
+}
+
+// Per-issue transitions based on current status category.
+var transitionsByStatus = map[string][]transition{
+	"In Progress": {
+		{ID: "21", Name: "Done", To: transitionTo{Name: "Done", StatusCategory: named{Name: "Done"}}},
+		{ID: "11", Name: "To Do", To: transitionTo{Name: "To Do", StatusCategory: named{Name: "To Do"}}},
+		{ID: "41", Name: "In Review", To: transitionTo{Name: "In Review", StatusCategory: named{Name: "In Progress"}}},
+	},
+	"To Do": {
+		{ID: "31", Name: "In Progress", To: transitionTo{Name: "In Progress", StatusCategory: named{Name: "In Progress"}}},
+		{ID: "21", Name: "Done", To: transitionTo{Name: "Done", StatusCategory: named{Name: "Done"}}},
+	},
+	"Done": {
+		{ID: "11", Name: "Reopen", To: transitionTo{Name: "To Do", StatusCategory: named{Name: "To Do"}}},
+	},
+	"Blocked": {
+		{ID: "31", Name: "In Progress", To: transitionTo{Name: "In Progress", StatusCategory: named{Name: "In Progress"}}},
+		{ID: "11", Name: "To Do", To: transitionTo{Name: "To Do", StatusCategory: named{Name: "To Do"}}},
+	},
+}
+
+func findIssue(key string) *issue {
+	for i := range data.Issues {
+		if data.Issues[i].Key == key {
+			return &data.Issues[i]
+		}
+	}
+	return nil
+}
+
+func splitPath(p string) []string {
+	var parts []string
+	for _, s := range strings.Split(p, "/") {
+		if s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return parts
+}
+
 func main() {
 	port := "18932"
 	if p := os.Getenv("PORT"); p != "" {
@@ -125,6 +180,59 @@ func main() {
 	http.HandleFunc("/rest/api/3/search/jql", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(data)
+	})
+
+	// GET: return available transitions; POST: execute transition
+	http.HandleFunc("/rest/api/3/issue/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract issue key and check path ends with /transitions
+		path := r.URL.Path
+		// /rest/api/3/issue/PROJ-101/transitions
+		const prefix = "/rest/api/3/issue/"
+		trimmed := path[len(prefix):]
+		parts := splitPath(trimmed)
+		if len(parts) != 2 || parts[1] != "transitions" {
+			http.NotFound(w, r)
+			return
+		}
+		issueKey := parts[0]
+		iss := findIssue(issueKey)
+		if iss == nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		switch r.Method {
+		case "GET":
+			statusCat := iss.Fields.Status.StatusCategory.Name
+			transitions := transitionsByStatus[statusCat]
+			if transitions == nil {
+				transitions = []transition{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
+
+		case "POST":
+			var body struct {
+				Transition struct {
+					ID string `json:"id"`
+				} `json:"transition"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+
+			// Find the transition and apply it
+			statusCat := iss.Fields.Status.StatusCategory.Name
+			for _, t := range transitionsByStatus[statusCat] {
+				if t.ID == body.Transition.ID {
+					iss.Fields.Status.Name = t.To.Name
+					iss.Fields.Status.StatusCategory = t.To.StatusCategory
+					break
+				}
+			}
+			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 
 	fmt.Fprintf(os.Stderr, "Mock Jira server listening on :%s\n", port)

@@ -1,5 +1,5 @@
 # jirascrap e2e demo
-# Exercises: list → select → detail → tag → todo → back → refresh → debug
+# Exercises: list → select → detail → tag → todo → back → status → refresh → debug
 
 Output e2e/demo.gif
 Set Shell bash
@@ -71,6 +71,17 @@ Sleep 1s
 # --- Go back to list ---
 Escape
 Sleep 1s
+
+# --- Status transition ---
+# Open status dropdown on current ticket
+Type "s"
+Sleep 2s
+
+# Navigate transitions and select one
+Down
+Sleep 300ms
+Enter
+Sleep 2s
 
 # --- Refresh from Jira ---
 Type "r"

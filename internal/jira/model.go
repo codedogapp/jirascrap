@@ -55,6 +55,37 @@ type status struct {
 
 const jiraTimeLayout = "2006-01-02T15:04:05.000-0700"
 
+// Transition represents an available status transition for an issue.
+type Transition struct {
+	ID               string
+	Name             string
+	ToStatus         string
+	ToStatusCategory string
+}
+
+type transitionsResponse struct {
+	Transitions []transitionEntry `json:"transitions"`
+}
+
+type transitionEntry struct {
+	ID   string           `json:"id"`
+	Name string           `json:"name"`
+	To   transitionTarget `json:"to"`
+}
+
+type transitionTarget struct {
+	Name           string         `json:"name"`
+	StatusCategory statusCategory `json:"statusCategory"`
+}
+
+type transitionRequest struct {
+	Transition transitionRef `json:"transition"`
+}
+
+type transitionRef struct {
+	ID string `json:"id"`
+}
+
 type jiraTime struct {
 	time.Time
 }

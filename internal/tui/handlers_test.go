@@ -63,6 +63,7 @@ func TestIsPopupActive_OnList(t *testing.T) {
 		activeModel: list,
 		tagModel:    views.NewTagModel(0, 0, nil),
 		todoModel:   views.NewTodoModel(0, 0, "", nil),
+		statusModel: views.NewStatusModel(0, 0),
 	}
 
 	if app.isPopupActive() {
@@ -80,9 +81,28 @@ func TestIsPopupActive_OnDetail_NoPopup(t *testing.T) {
 		activeModel: detail,
 		tagModel:    views.NewTagModel(0, 0, nil),
 		todoModel:   views.NewTodoModel(0, 0, "", nil),
+		statusModel: views.NewStatusModel(0, 0),
 	}
 
 	if app.isPopupActive() {
 		t.Error("expected false when no popup is open")
+	}
+}
+
+func TestIsPopupActive_StatusVisible(t *testing.T) {
+	styles := views.NewStyles()
+	list := views.NewListModel(nil, styles.App)
+	statusModel := views.NewStatusModel(0, 0)
+	statusModel.Show(model.Ticket{ID: "T-1", Summary: "test"})
+
+	app := &AppModel{
+		activeModel: list,
+		tagModel:    views.NewTagModel(0, 0, nil),
+		todoModel:   views.NewTodoModel(0, 0, "", nil),
+		statusModel: statusModel,
+	}
+
+	if !app.isPopupActive() {
+		t.Error("expected true when status dropdown is visible")
 	}
 }

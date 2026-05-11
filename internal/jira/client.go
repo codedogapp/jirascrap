@@ -30,6 +30,57 @@ func NewClient(cfg *config.Config) *Client {
 	}
 }
 
+// doRequest executes an authenticated request and returns the response body.
+// It checks that the status code is one of the accepted codes.
+func (c *Client) doRequest(method, url string, body any, acceptedStatus ...int) ([]byte, error) {
+	var reqBody io.Reader
+	if body != nil {
+		jsonBytes, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request: %w", err)
+		}
+		reqBody = bytes.NewBuffer(jsonBytes)
+	}
+
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.SetBasicAuth(c.email, c.token)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if len(acceptedStatus) == 0 {
+		acceptedStatus = []int{http.StatusOK}
+	}
+	accepted := false
+	for _, s := range acceptedStatus {
+		if resp.StatusCode == s {
+			accepted = true
+			break
+		}
+	}
+	if !accepted {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("jira api error [%d]: %s", resp.StatusCode, string(respBody))
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	return respBody, nil
+}
+
 func (c *Client) FetchTickets() ([]model.Ticket, error) {
 	return c.fetchTickets(defaultJQL)
 }
@@ -57,32 +108,13 @@ func (c *Client) fetchTickets(jql string) ([]model.Ticket, error) {
 		},
 	}
 
-	reqJSON, err := json.Marshal(reqBody)
+	respBody, err := c.doRequest("POST", url, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(c.email, c.token)
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("network error: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("jira api error [%d]: %s", resp.StatusCode, string(bodyBytes))
+		return nil, err
 	}
 
 	var jiraResp searchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&jiraResp); err != nil {
+	if err := json.Unmarshal(respBody, &jiraResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -103,6 +135,42 @@ func (c *Client) fetchTickets(jql string) ([]model.Ticket, error) {
 	}
 
 	return tickets, nil
+}
+
+func (c *Client) FetchTransitions(issueKey string) ([]Transition, error) {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.domain, issueKey)
+
+	respBody, err := c.doRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result transitionsResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	var transitions []Transition
+	for _, t := range result.Transitions {
+		transitions = append(transitions, Transition{
+			ID:               t.ID,
+			Name:             t.Name,
+			ToStatus:         t.To.Name,
+			ToStatusCategory: t.To.StatusCategory.Name,
+		})
+	}
+
+	return transitions, nil
+}
+
+func (c *Client) DoTransition(issueKey string, transitionID string) error {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.domain, issueKey)
+
+	_, err := c.doRequest("POST", url,
+		transitionRequest{Transition: transitionRef{ID: transitionID}},
+		http.StatusOK, http.StatusNoContent,
+	)
+	return err
 }
 
 func (c *Client) FetchAllEpicChildren(tickets []model.Ticket) (map[string][]model.Ticket, error) {
