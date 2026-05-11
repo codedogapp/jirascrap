@@ -8,12 +8,13 @@ import (
 )
 
 type mockStore struct {
-	tags     []string
-	todos    map[string][]model.Todo
-	tickets  []model.Ticket
-	tagsErr  error
-	todosErr error
-	cacheErr error
+	tags         []string
+	todos        map[string][]model.Todo
+	tickets      []model.Ticket
+	epicChildren map[string][]model.Ticket
+	tagsErr      error
+	todosErr     error
+	cacheErr     error
 }
 
 func (m *mockStore) SaveMeta(id string, tags []string) error {
@@ -48,12 +49,19 @@ func (m *mockStore) GetCachedTickets() ([]model.Ticket, error) {
 	return m.tickets, m.cacheErr
 }
 
-func (m *mockStore) CacheEpicChildren(_ string, _ []model.Ticket) error {
+func (m *mockStore) CacheEpicChildren(epicKey string, tickets []model.Ticket) error {
+	if m.epicChildren == nil {
+		m.epicChildren = make(map[string][]model.Ticket)
+	}
+	m.epicChildren[epicKey] = tickets
 	return nil
 }
 
 func (m *mockStore) GetAllCachedEpicChildren() (map[string][]model.Ticket, error) {
-	return map[string][]model.Ticket{}, nil
+	if m.epicChildren == nil {
+		return map[string][]model.Ticket{}, nil
+	}
+	return m.epicChildren, nil
 }
 
 func TestIsPopupActive_OnList(t *testing.T) {

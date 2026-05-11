@@ -8,12 +8,14 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/codedogapp/jirascrap/internal/logger"
 	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/tmux"
 	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 )
 
-var copilotSession = tmux.NewSession("copilot")
+// copilotSession is always valid — "copilot" passes sanitizeName.
+var copilotSession, _ = tmux.NewSession("copilot")
 
 func (m *AppModel) handleSendToCopilot(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if !key.Matches(msg, keymaps.DefaultKeyMap.SendToCopilot) {
@@ -25,7 +27,10 @@ func (m *AppModel) handleSendToCopilot(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	todos, _ := m.store.GetTodos(ticket.ID)
+	todos, err := m.store.GetTodos(ticket.ID)
+	if err != nil {
+		logger.Log.Warn("failed to load todos for copilot: " + err.Error())
+	}
 
 	return true, m.sendToCopilotCmd(ticket, todos)
 }
@@ -121,8 +126,8 @@ func buildCopilotPrompt(ticket model.Ticket, todos []model.Todo) string {
 	b.WriteString(fmt.Sprintf("- **Type:** %s\n", ticket.Type))
 	b.WriteString(fmt.Sprintf("- **Reporter:** %s\n", ticket.Reporter))
 
-	if ticket.EpicID != "" {
-		b.WriteString(fmt.Sprintf("- **Epic:** %s\n", ticket.EpicID))
+	if ticket.EpicID != nil {
+		b.WriteString(fmt.Sprintf("- **Epic:** %s\n", *ticket.EpicID))
 	}
 
 	if len(ticket.Tags) > 0 {

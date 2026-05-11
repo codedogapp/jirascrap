@@ -24,6 +24,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		os.Exit(1)
 	}
+	defer sqliteDB.Close()
 
 	metaStore := store.NewSqliteMetaStore(sqliteDB.DB)
 

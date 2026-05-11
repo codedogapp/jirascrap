@@ -3,8 +3,23 @@ package tmux
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
+
+// validName matches allowed tmux session/window name characters.
+var validName = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+// sanitizeName validates a tmux session or window name.
+func sanitizeName(name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("tmux name cannot be empty")
+	}
+	if !validName.MatchString(name) {
+		return "", fmt.Errorf("tmux name %q contains invalid characters (allowed: alphanumeric, dot, dash, underscore)", name)
+	}
+	return name, nil
+}
 
 // Session manages a named tmux session.
 type Session struct {
@@ -12,8 +27,12 @@ type Session struct {
 }
 
 // NewSession returns a Session handle for the given name.
-func NewSession(name string) *Session {
-	return &Session{Name: name}
+func NewSession(name string) (*Session, error) {
+	safe, err := sanitizeName(name)
+	if err != nil {
+		return nil, err
+	}
+	return &Session{Name: safe}, nil
 }
 
 // Ensure creates the session if it doesn't exist, starting in the given directory.
@@ -73,12 +92,16 @@ func (s *Session) RenameWindow(windowID, name string) error {
 
 // NewWindow creates a new window in the session and returns its ID.
 func (s *Session) NewWindow(name, dir string) (string, error) {
+	safe, err := sanitizeName(name)
+	if err != nil {
+		return "", err
+	}
 	out, err := output(
 		"new-window",
 		"-t",
 		s.Name,
 		"-n",
-		name,
+		safe,
 		"-c",
 		dir,
 		"-P",

@@ -5,8 +5,9 @@ import (
 )
 
 type Logger struct {
-	mu   sync.Mutex
-	logs []LogEntry
+	mu       sync.Mutex
+	logs     []LogEntry
+	minLevel Level
 }
 
 type LogEntry struct {
@@ -25,7 +26,7 @@ const (
 
 const maxLogs = 100
 
-var Log = &Logger{}
+var Log = &Logger{minLevel: DEBUG}
 
 func (l Level) String() string {
 	switch l {
@@ -59,10 +60,13 @@ func (l *Logger) Warn(msg string) {
 }
 
 func (l *Logger) add(level Level, msg string) {
+	if level < l.minLevel {
+		return
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	log := LogEntry{Level: level, Message: msg}
-	l.logs = append(l.logs, log)
+	l.logs = append(l.logs, LogEntry{Level: level, Message: msg})
 	if len(l.logs) > maxLogs {
 		l.logs = l.logs[len(l.logs)-maxLogs:]
 	}

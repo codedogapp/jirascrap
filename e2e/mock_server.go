@@ -122,9 +122,9 @@ type transitionsResponse struct {
 }
 
 type transition struct {
-	ID   string         `json:"id"`
-	Name string         `json:"name"`
-	To   transitionTo   `json:"to"`
+	ID   string       `json:"id"`
+	Name string       `json:"name"`
+	To   transitionTo `json:"to"`
 }
 
 type transitionTo struct {

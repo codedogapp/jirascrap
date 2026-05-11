@@ -192,22 +192,14 @@ func (m *TagModel) View() *lipgloss.Layer {
 		popupContent += "\n\n" + m.renderSuggestions()
 	}
 
-	popupContentStyled := lipgloss.NewStyle().Padding(1, 1).Render(popupContent)
-
-	popupView := tagViewPopUp.Render(popupContentStyled)
-
 	overlayWidth := m.contentWidth / RatioWidth
-	dashes := strings.Repeat("─", overlayWidth+1)
-	topLine := topBorder.Render("╭─ ") +
-		popUpTitle.Render("TAG") +
-		topBorder.Render(" "+dashes+"╮")
-
-	content := topLine + "\n" + popupView
-
-	return lipgloss.NewLayer(content).
-		X((m.contentWidth - overlayWidth) / 2).
-		Y((m.contentHeight - RatioHeight) / 2).
-		Z(1)
+	return RenderPopupLayer(
+		popupContent,
+		"TAG",
+		(m.contentWidth-overlayWidth)/2,
+		(m.contentHeight-RatioHeight)/2,
+		ZPopup,
+	)
 }
 
 func (m *TagModel) renderSuggestions() string {

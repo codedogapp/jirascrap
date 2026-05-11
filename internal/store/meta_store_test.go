@@ -403,8 +403,8 @@ func TestCacheEpicChildren_AndGetAll(t *testing.T) {
 	if len(got["EPIC-1"]) != 2 {
 		t.Fatalf("expected 2 children, got %d", len(got["EPIC-1"]))
 	}
-	if got["EPIC-1"][0].EpicID != "EPIC-1" {
-		t.Errorf("child EpicID = %q, want EPIC-1", got["EPIC-1"][0].EpicID)
+	if got["EPIC-1"][0].EpicID == nil || *got["EPIC-1"][0].EpicID != "EPIC-1" {
+		t.Errorf("child EpicID = %v, want EPIC-1", got["EPIC-1"][0].EpicID)
 	}
 }
 

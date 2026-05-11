@@ -14,7 +14,7 @@ import (
 
 type AppModel struct {
 	// Dependencies
-	jiraClient *jira.Client
+	jiraClient jira.TicketClient
 	store      store.MetaStore
 	config     *config.Config
 
@@ -37,7 +37,7 @@ type AppModel struct {
 	height int
 }
 
-func NewApp(client *jira.Client, s store.MetaStore, cfg *config.Config) *AppModel {
+func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *AppModel {
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
@@ -230,7 +230,7 @@ func (m *AppModel) View() tea.View {
 	return v
 }
 
-func Run(client *jira.Client, s store.MetaStore, cfg *config.Config) error {
+func Run(client jira.TicketClient, s store.MetaStore, cfg *config.Config) error {
 	app := NewApp(client, s, cfg)
 	p := tea.NewProgram(app)
 	_, err := p.Run()

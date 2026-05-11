@@ -70,7 +70,7 @@ func (m *DebugModel) View() *lipgloss.Layer {
 	overlay := lipgloss.NewLayer(content).
 		X((m.terminalWidth - overlayWidth) / 2).
 		Y((m.terminalHeight - overlayHeight) / 2).
-		Z(1)
+		Z(ZPopup)
 
 	return overlay
 }

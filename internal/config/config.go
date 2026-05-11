@@ -17,6 +17,15 @@ type Config struct {
 	CopilotModel     string
 }
 
+// String implements fmt.Stringer, masking the API token to prevent accidental logging.
+func (c Config) String() string {
+	masked := "***"
+	if len(c.APIToken) > 4 {
+		masked = c.APIToken[:4] + "***"
+	}
+	return fmt.Sprintf("Config{Domain:%s Email:%s APIToken:%s DBPath:%s}", c.Domain, c.Email, masked, c.DBPath)
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		Domain:           os.Getenv("JIRA_BASE_URL"),

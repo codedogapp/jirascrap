@@ -3,7 +3,6 @@ package views
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
@@ -137,13 +136,11 @@ func (m *StatusModel) View() *lipgloss.Layer {
 		content = lipgloss.NewStyle().
 			Foreground(grey).
 			Italic(true).
-			Padding(1, 1).
 			Render("loading…")
 	} else if len(m.list.Items()) == 0 {
 		content = lipgloss.NewStyle().
 			Foreground(grey).
 			Italic(true).
-			Padding(1, 1).
 			Render("no transitions")
 	} else {
 		content = m.list.View()
@@ -158,26 +155,13 @@ func (m *StatusModel) View() *lipgloss.Layer {
 		Foreground(grey).
 		Render("→")
 
-	contentStyled := lipgloss.NewStyle().Padding(1, 1).Render(header + "\n" + content)
-
-	popupView := tagViewPopUp.Render(contentStyled)
-	popupWidth := lipgloss.Width(popupView)
-
-	dashCount := popupWidth - lipgloss.Width("╭─ STATUS ╮")
-	if dashCount < 0 {
-		dashCount = 0
-	}
-	dashes := strings.Repeat("─", dashCount)
-	topLine := topBorder.Render("╭─ ") +
-		popUpTitle.Render("STATUS") +
-		topBorder.Render(" "+dashes+"╮")
-
-	full := topLine + "\n" + popupView
-
-	return lipgloss.NewLayer(full).
-		X(2).
-		Y(3).
-		Z(2)
+	return RenderPopupLayer(
+		header+"\n"+content,
+		"STATUS",
+		2,
+		3,
+		ZStatus,
+	)
 }
 
 type transitionDelegate struct{}

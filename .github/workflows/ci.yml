@@ -16,6 +16,14 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Files not formatted:"
+            gofmt -l .
+            exit 1
+          fi
+
       - name: Build
         run: go build ./...
 
@@ -23,4 +31,15 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test ./... -count=1
+        run: go test -race -coverprofile=coverage.out ./... -count=1
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+      - name: Security scan
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -quiet ./...

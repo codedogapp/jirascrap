@@ -7,7 +7,7 @@ import (
 )
 
 func newTestLogger() *Logger {
-	return &Logger{}
+	return &Logger{minLevel: DEBUG}
 }
 
 func TestLogger_BasicLevels(t *testing.T) {
