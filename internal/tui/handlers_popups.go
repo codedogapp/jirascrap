@@ -53,7 +53,7 @@ func (m *AppModel) handleToggleTag(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	allTags, err := m.store.GetUniqueTags()
+	allTags, err := m.tagStore.GetUniqueTags()
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to load tags: %v", err))
 	}
@@ -77,7 +77,7 @@ func (m *AppModel) handleToggleTodo(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return true, nil
 	}
 
-	todos, err := m.store.GetTodos(ticket.ID)
+	todos, err := m.todoStore.GetTodos(ticket.ID)
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to load todos: %v", err))
 	}
@@ -99,7 +99,7 @@ func (m *AppModel) handleTodosChanged(msg views.TodosChangedMsg) (tea.Model, tea
 func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 	m.refreshListsFromDB()
 
-	allTags, err := m.store.GetUniqueTags()
+	allTags, err := m.tagStore.GetUniqueTags()
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to load tags after save: %v", err))
 	}
@@ -116,7 +116,7 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
 	return func() tea.Msg {
-		err := m.store.SaveMeta(id, tags)
+		err := m.tagStore.SaveMeta(id, tags)
 		if err != nil {
 			return views.ErrMsg{Err: err}
 		}
@@ -127,7 +127,7 @@ func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
 
 func (m *AppModel) saveTodosCmd(ticketID string, todos []model.Todo) tea.Cmd {
 	return func() tea.Msg {
-		err := m.store.SaveTodos(ticketID, todos)
+		err := m.todoStore.SaveTodos(ticketID, todos)
 		if err != nil {
 			return views.ErrMsg{Err: err}
 		}
@@ -205,19 +205,18 @@ func (m *AppModel) handleStatusTransitionComplete(msg statusTransitionCompleteMs
 
 // updateTicketStatus updates ticket status in-memory across main list, epic children, and detail view.
 func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory string) {
-	update := func(tickets []model.Ticket) []model.Ticket {
+	update := func(tickets []model.Ticket) {
 		for i := range tickets {
 			if tickets[i].ID == ticketID {
 				tickets[i].Status = newStatus
 				tickets[i].StatusCategory = newStatusCategory
 			}
 		}
-		return tickets
 	}
 
 	if root := m.rootList(); root != nil {
 		if _, ok := root.FindTicket(ticketID); ok {
-			tickets, err := m.store.GetCachedTickets()
+			tickets, err := m.ticketCache.GetCachedTickets()
 			if err != nil {
 				logger.Log.Warn(fmt.Sprintf("failed to re-read tickets for status update: %v", err))
 			} else {
@@ -227,8 +226,8 @@ func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory str
 		}
 	}
 
-	for epicKey, children := range m.epicChildren {
-		m.epicChildren[epicKey] = update(children)
+	for _, children := range m.epicChildren {
+		update(children)
 	}
 
 	m.refreshCurrentEpicView()

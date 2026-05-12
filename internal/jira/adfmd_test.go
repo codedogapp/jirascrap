@@ -454,3 +454,32 @@ func TestMarkdownToADF_Table(t *testing.T) {
 		t.Errorf("expected table, got %v", table["type"])
 	}
 }
+
+func TestADFToMarkdown_RaggedTable(t *testing.T) {
+	// Table where a data row has fewer cells than the header — must not panic.
+	table := map[string]any{
+		"type": "table",
+		"content": []any{
+			map[string]any{
+				"type": "tableRow",
+				"content": []any{
+					map[string]any{"type": "tableHeader", "content": []any{paragraph(text("A"))}},
+					map[string]any{"type": "tableHeader", "content": []any{paragraph(text("B"))}},
+					map[string]any{"type": "tableHeader", "content": []any{paragraph(text("C"))}},
+				},
+			},
+			map[string]any{
+				"type": "tableRow",
+				"content": []any{
+					map[string]any{"type": "tableCell", "content": []any{paragraph(text("1"))}},
+					// only 1 cell instead of 3
+				},
+			},
+		},
+	}
+	doc := adf(table)
+	got := ADFToMarkdown(doc)
+	if got == "" {
+		t.Error("expected non-empty output for ragged table")
+	}
+}

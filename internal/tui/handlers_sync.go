@@ -16,11 +16,11 @@ const apiTimeout = 30 * time.Second
 
 func (m *AppModel) loadCachedTickets() tea.Cmd {
 	return func() tea.Msg {
-		epicChildren, err := m.store.GetAllCachedEpicChildren()
+		epicChildren, err := m.ticketCache.GetAllCachedEpicChildren()
 		if err != nil {
 			logger.Log.Warn(fmt.Sprintf("failed to load cached epic children: %v", err))
 		}
-		tickets, err := m.store.GetCachedTickets()
+		tickets, err := m.ticketCache.GetCachedTickets()
 		if err != nil {
 			logger.Log.Warn(fmt.Sprintf("failed to load cached tickets: %v", err))
 			return cachedTicketsLoadedMsg{epicChildren: epicChildren}
@@ -41,7 +41,7 @@ func (m *AppModel) syncFromJira() tea.Cmd {
 		if err != nil {
 			return syncErrorMsg{err: err}
 		}
-		if err := m.store.CacheTickets(tickets); err != nil {
+		if err := m.ticketCache.CacheTickets(tickets); err != nil {
 			logger.Log.Warn(fmt.Sprintf("failed to cache tickets: %v", err))
 		}
 
@@ -53,18 +53,18 @@ func (m *AppModel) syncFromJira() tea.Cmd {
 			logger.Log.Warn(fmt.Sprintf("failed to fetch some epic children: %v", err))
 		}
 		for epicKey, children := range epicChildren {
-			if err := m.store.CacheEpicChildren(epicKey, children); err != nil {
+			if err := m.ticketCache.CacheEpicChildren(epicKey, children); err != nil {
 				logger.Log.Warn(fmt.Sprintf("failed to cache epic children for %s: %v", epicKey, err))
 			}
 		}
 
 		// Re-read from DB: tags joined, epic children excluded from main list
-		mainTickets, err := m.store.GetCachedTickets()
+		mainTickets, err := m.ticketCache.GetCachedTickets()
 		if err != nil {
 			logger.Log.Warn(fmt.Sprintf("failed to re-read cached tickets: %v", err))
 			mainTickets = tickets // fall back to API data
 		}
-		allChildren, err := m.store.GetAllCachedEpicChildren()
+		allChildren, err := m.ticketCache.GetAllCachedEpicChildren()
 		if err != nil {
 			logger.Log.Warn(fmt.Sprintf("failed to re-read epic children: %v", err))
 			allChildren = epicChildren // fall back to API data
@@ -110,22 +110,20 @@ func (m *AppModel) handleSyncError(msg syncErrorMsg) (tea.Model, tea.Cmd) {
 
 	root := m.rootList()
 	root.SetTitle("Jira Tickets")
-
-	if root.HasTickets() {
-		return m, nil
-	}
-
-	m.err = views.ErrMsg{Err: msg.err}
-
 	root.StopSpinner()
 
+	if root.HasTickets() {
+		return m, m.popups.toast.Show(fmt.Sprintf("✗ Sync failed: %v", msg.err))
+	}
+
+	// No cached data at all — show full error screen
+	m.err = views.ErrMsg{Err: msg.err}
 	return m, nil
 }
 
 func (m *AppModel) handleError(msg views.ErrMsg) (tea.Model, tea.Cmd) {
-	m.err = msg
 	m.list.StopSpinner()
-	return m, nil
+	return m, m.popups.toast.Show(fmt.Sprintf("✗ %v", msg.Err))
 }
 
 func (m *AppModel) handleRefresh(msg tea.KeyPressMsg) (bool, tea.Cmd) {
@@ -133,6 +131,7 @@ func (m *AppModel) handleRefresh(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		!m.isPopupActive() &&
 		!m.syncing &&
 		!m.list.IsFiltering() {
+		m.err = nil
 		m.syncing = true
 		root := m.rootList()
 		root.SetTitle("Jira Tickets (syncing...)")

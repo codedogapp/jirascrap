@@ -27,7 +27,7 @@ func (m *AppModel) handleSendToCopilot(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	todos, err := m.store.GetTodos(ticket.ID)
+	todos, err := m.todoStore.GetTodos(ticket.ID)
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to load todos for copilot: %v", err))
 	}
@@ -69,14 +69,14 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 		}
 
 		// Launch copilot
-		cdCmd := fmt.Sprintf("cd %s", workspace)
+		cdCmd := fmt.Sprintf("cd %s", shellQuote(workspace))
 		if err := copilotSession.SendKeys(windowID, cdCmd); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("cd to workspace: %w", err)}
 		}
 
 		copilotCmd := fmt.Sprintf(
-			"copilot --plan --model %s --allow-all-paths -i \"$(cat '%s')\"",
-			copilotModel, promptPath,
+			"copilot --plan --model %s --allow-all-paths -i \"$(cat %s)\"",
+			shellQuote(copilotModel), shellQuote(promptPath),
 		)
 		if err := copilotSession.SendKeys(windowID, copilotCmd); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("launching copilot: %w", err)}
@@ -169,4 +169,9 @@ func (m *AppModel) handleCopilotLaunched(msg copilotLaunchedMsg) (tea.Model, tea
 	return m, m.popups.toast.Show(
 		fmt.Sprintf("✓ Copilot launched for %s — tmux attach -t %s", msg.ticketID, copilotSession.Name),
 	)
+}
+
+// shellQuote wraps a string in single quotes, escaping embedded single quotes.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }

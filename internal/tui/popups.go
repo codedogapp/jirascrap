@@ -6,6 +6,9 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+// popupKeyHandler handles a key press for a specific popup.
+type popupKeyHandler func(tea.KeyPressMsg) (tea.Model, tea.Cmd)
+
 // PopupManager centralizes popup visibility checks, key routing, and overlay rendering.
 type PopupManager struct {
 	tag    *views.TagModel
@@ -13,9 +16,20 @@ type PopupManager struct {
 	status *views.StatusModel
 	debug  *views.DebugModel
 	toast  *views.ToastModel
+
+	// Key handlers set by AppModel to avoid circular dependency.
+	onTagKey    popupKeyHandler
+	onTodoKey   popupKeyHandler
+	onStatusKey popupKeyHandler
 }
 
-func newPopupManager(tag *views.TagModel, todo *views.TodoModel, status *views.StatusModel, debug *views.DebugModel, toast *views.ToastModel) *PopupManager {
+func newPopupManager(
+	tag *views.TagModel,
+	todo *views.TodoModel,
+	status *views.StatusModel,
+	debug *views.DebugModel,
+	toast *views.ToastModel,
+) *PopupManager {
 	return &PopupManager{
 		tag:    tag,
 		todo:   todo,
@@ -25,6 +39,13 @@ func newPopupManager(tag *views.TagModel, todo *views.TodoModel, status *views.S
 	}
 }
 
+// SetKeyHandlers wires up the popup key handlers. Called once after AppModel construction.
+func (p *PopupManager) SetKeyHandlers(tag, todo, status popupKeyHandler) {
+	p.onTagKey = tag
+	p.onTodoKey = todo
+	p.onStatusKey = status
+}
+
 // IsActive returns true if any modal popup is visible (excludes debug/toast which are non-blocking).
 func (p *PopupManager) IsActive() bool {
 	return p.tag.IsVisible() || p.todo.IsVisible() || p.status.IsVisible()
@@ -32,17 +53,17 @@ func (p *PopupManager) IsActive() bool {
 
 // RouteKeyPress dispatches a key to the active popup if one is visible.
 // Returns (handled, cmd). If handled is false, no popup consumed the key.
-func (p *PopupManager) RouteKeyPress(msg tea.KeyPressMsg, app *AppModel) (bool, tea.Cmd) {
+func (p *PopupManager) RouteKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if p.tag.IsVisible() {
-		_, cmd := app.handleTagKey(msg)
+		_, cmd := p.onTagKey(msg)
 		return true, cmd
 	}
 	if p.todo.IsVisible() {
-		_, cmd := app.handleTodoKey(msg)
+		_, cmd := p.onTodoKey(msg)
 		return true, cmd
 	}
 	if p.status.IsVisible() {
-		_, cmd := app.handleStatusKey(msg)
+		_, cmd := p.onStatusKey(msg)
 		return true, cmd
 	}
 	return false, nil

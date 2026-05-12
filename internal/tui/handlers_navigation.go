@@ -80,11 +80,11 @@ func (m *AppModel) fetchEpicChildrenCmd(epicKey string) tea.Cmd {
 }
 
 func (m *AppModel) handleEpicChildrenLoaded(msg epicChildrenLoadedMsg) (tea.Model, tea.Cmd) {
-	if err := m.store.CacheEpicChildren(msg.epicKey, msg.tickets); err != nil {
+	if err := m.ticketCache.CacheEpicChildren(msg.epicKey, msg.tickets); err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to cache epic children: %v", err))
 	}
 	// Re-read from DB to get tags joined in
-	allChildren, err := m.store.GetAllCachedEpicChildren()
+	allChildren, err := m.ticketCache.GetAllCachedEpicChildren()
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to re-read epic children: %v", err))
 		// Fall back to the data we have
@@ -170,14 +170,14 @@ func (m *AppModel) activeDetailModel() (*views.DetailModel, bool) {
 
 // refreshListsFromDB re-reads tickets and epic children from DB, then updates all list views.
 func (m *AppModel) refreshListsFromDB() {
-	tickets, err := m.store.GetCachedTickets()
+	tickets, err := m.ticketCache.GetCachedTickets()
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to re-read tickets from DB: %v", err))
 	} else {
 		m.rootList().SetItems(tickets)
 	}
 
-	epicChildren, err := m.store.GetAllCachedEpicChildren()
+	epicChildren, err := m.ticketCache.GetAllCachedEpicChildren()
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to re-read epic children from DB: %v", err))
 	} else {

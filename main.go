@@ -32,9 +32,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	metaStore := store.NewSqliteMetaStore(sqliteDB.DB)
+	tagStore := store.NewSqliteTagStore(sqliteDB.DB)
+	todoStore := store.NewSqliteTodoStore(sqliteDB.DB)
+	ticketCache := store.NewSqliteTicketCache(sqliteDB.DB)
 
-	err = tui.Run(ctx, apiClient, metaStore, cfg)
+	err = tui.Run(ctx, apiClient, tagStore, todoStore, ticketCache, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		os.Exit(1)

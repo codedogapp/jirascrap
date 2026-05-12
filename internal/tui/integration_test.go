@@ -35,7 +35,10 @@ func (c *mockClient) FetchEpicChildren(_ context.Context, epicKey string) ([]mod
 	return c.epicChildren[epicKey], nil
 }
 
-func (c *mockClient) FetchAllEpicChildren(_ context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error) {
+func (c *mockClient) FetchAllEpicChildren(
+	_ context.Context,
+	tickets []model.Ticket,
+) (map[string][]model.Ticket, error) {
 	if c.epicChildren == nil {
 		return map[string][]model.Ticket{}, nil
 	}
@@ -102,7 +105,7 @@ var testCfg = &config.Config{
 
 func newTestApp(client *mockClient) *AppModel {
 	st := &mockStore{tickets: client.tickets}
-	return NewApp(client, st, testCfg)
+	return NewApp(client, st, st, st, testCfg)
 }
 
 // sendSize simulates a terminal resize to give models dimensions.
@@ -266,7 +269,7 @@ func TestIntegration_EpicDrillDown(t *testing.T) {
 func TestIntegration_TagPopup(t *testing.T) {
 	client := &mockClient{tickets: testTickets, epicChildren: testEpicChildren}
 	st := &mockStore{tickets: testTickets, tags: []string{"frontend", "backend"}}
-	app := NewApp(client, st, testCfg)
+	app := NewApp(client, st, st, st, testCfg)
 	sendSize(t, app, 120, 40)
 	runInit(t, app)
 
@@ -293,7 +296,7 @@ func TestIntegration_TodoPopup(t *testing.T) {
 	st := &mockStore{tickets: testTickets, todos: map[string][]model.Todo{
 		"PROJ-1": {{Title: "Existing todo", Done: false}},
 	}}
-	app := NewApp(client, st, testCfg)
+	app := NewApp(client, st, st, st, testCfg)
 	sendSize(t, app, 120, 40)
 	runInit(t, app)
 
@@ -339,7 +342,7 @@ func TestIntegration_SyncError(t *testing.T) {
 	}
 	// Give store some cached tickets so sync error doesn't go to fatal state
 	st := &mockStore{tickets: testTickets}
-	app := NewApp(client, st, testCfg)
+	app := NewApp(client, st, st, st, testCfg)
 	sendSize(t, app, 120, 40)
 	runInit(t, app)
 
@@ -361,7 +364,7 @@ func TestIntegration_SyncError_NoCachedData(t *testing.T) {
 	}
 	// No cached data — sync error should be fatal
 	st := &mockStore{tickets: nil}
-	app := NewApp(client, st, testCfg)
+	app := NewApp(client, st, st, st, testCfg)
 	sendSize(t, app, 120, 40)
 	runInit(t, app)
 

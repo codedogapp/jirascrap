@@ -76,7 +76,10 @@ func Load() (*Config, error) {
 	}
 
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("missing configuration:\n%w\n\nSet these in your shell environment.", errors.Join(errs...))
+		return nil, fmt.Errorf(
+			"missing configuration:\n%w\n\nSet these in your shell environment.",
+			errors.Join(errs...),
+		)
 	}
 
 	if err := cfg.Validate(); err != nil {

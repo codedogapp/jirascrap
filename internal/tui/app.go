@@ -23,9 +23,11 @@ const (
 
 type AppModel struct {
 	// Dependencies
-	jiraClient jira.TicketClient
-	store      store.MetaStore
-	config     *config.Config
+	jiraClient  jira.TicketClient
+	tagStore    store.TagStore
+	todoStore   store.TodoStore
+	ticketCache store.TicketCache
+	config      *config.Config
 
 	// State
 	list         *views.ListModel
@@ -43,7 +45,13 @@ type AppModel struct {
 	height int
 }
 
-func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *AppModel {
+func NewApp(
+	client jira.TicketClient,
+	tags store.TagStore,
+	todos store.TodoStore,
+	cache store.TicketCache,
+	cfg *config.Config,
+) *AppModel {
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
@@ -52,9 +60,11 @@ func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *Ap
 	statusModel := views.NewStatusModel(0, 0)
 	toastModel := views.NewToastModel(0, 0)
 
-	return &AppModel{
+	app := &AppModel{
 		jiraClient:   client,
-		store:        s,
+		tagStore:     tags,
+		todoStore:    todos,
+		ticketCache:  cache,
 		config:       cfg,
 		list:         listModel,
 		navLevel:     navRoot,
@@ -63,6 +73,10 @@ func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *Ap
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 	}
+
+	app.popups.SetKeyHandlers(app.handleTagKey, app.handleTodoKey, app.handleStatusKey)
+
+	return app
 }
 
 func (m *AppModel) Init() tea.Cmd {
@@ -113,6 +127,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tagSavedMsg:
 		return m.handleTagSaved(msg)
 
+	case todoSavedMsg:
+		return m, m.popups.toast.Show("✓ Todos saved")
+
 	case copilotLaunchedMsg:
 		return m.handleCopilotLaunched(msg)
 
@@ -133,7 +150,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
 	case views.ToastTimeoutMsg:
-		m.popups.toast.Hide()
+		if m.popups.toast.ShouldHide(msg) {
+			m.popups.toast.Hide()
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -151,7 +170,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if consumed, cmd := m.handleDebug(msg); consumed {
 		return m, cmd
 	}
-	if consumed, cmd := m.popups.RouteKeyPress(msg, m); consumed {
+	if consumed, cmd := m.popups.RouteKeyPress(msg); consumed {
 		return m, cmd
 	}
 	if consumed, cmd := m.handleRefresh(msg); consumed {
@@ -195,7 +214,7 @@ func (m *AppModel) handleOtherMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) View() tea.View {
 	if m.err != nil {
-		return tea.NewView(fmt.Sprintf("\nError: %v\n\nPress 'q' to quit.", m.err))
+		return tea.NewView(fmt.Sprintf("\nError: %v\n\nPress 'r' to retry or 'q' to quit.", m.err))
 	}
 
 	base := m.styles.App.Render(m.activeModel.View().Content)
@@ -213,8 +232,15 @@ func (m *AppModel) View() tea.View {
 	return v
 }
 
-func Run(ctx context.Context, client jira.TicketClient, s store.MetaStore, cfg *config.Config) error {
-	app := NewApp(client, s, cfg)
+func Run(
+	ctx context.Context,
+	client jira.TicketClient,
+	tags store.TagStore,
+	todos store.TodoStore,
+	cache store.TicketCache,
+	cfg *config.Config,
+) error {
+	app := NewApp(client, tags, todos, cache, cfg)
 	p := tea.NewProgram(app)
 
 	// Quit TUI gracefully when context is cancelled (e.g. SIGINT/SIGTERM).

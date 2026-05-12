@@ -77,8 +77,11 @@ func newHandlerTestApp(tickets []model.Ticket) *AppModel {
 	statusModel := views.NewStatusModel(80, 30)
 	toastModel := views.NewToastModel(120, 40)
 	debugModel := views.NewDebugModel(120, 40)
+	ms := &mockStore{tickets: tickets}
 	return &AppModel{
-		store:        &mockStore{tickets: tickets},
+		tagStore:     ms,
+		todoStore:    ms,
+		ticketCache:  ms,
 		list:         list,
 		activeModel:  list,
 		popups:       newPopupManager(tagModel, todoModel, statusModel, debugModel, toastModel),

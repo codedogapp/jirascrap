@@ -269,11 +269,12 @@ func tableToMarkdown(rows []any, indent int) string {
 	}
 
 	// Remove empty columns (glamour is weird with them)
+	headerLen := len(table[0])
 	emptyColumns := map[int]bool{}
-	for col := 0; col < len(table[0]); col++ {
+	for col := 0; col < headerLen; col++ {
 		empty := true
 		for _, row := range table[1:] {
-			if row[col] != "" {
+			if col < len(row) && row[col] != "" {
 				empty = false
 				break
 			}
@@ -286,9 +287,14 @@ func tableToMarkdown(rows []any, indent int) string {
 	var filteredTable [][]string
 	for _, row := range table {
 		var filteredRow []string
-		for i, cell := range row {
-			if !emptyColumns[i] {
-				filteredRow = append(filteredRow, cell)
+		for i := 0; i < headerLen; i++ {
+			if emptyColumns[i] {
+				continue
+			}
+			if i < len(row) {
+				filteredRow = append(filteredRow, row[i])
+			} else {
+				filteredRow = append(filteredRow, "")
 			}
 		}
 		filteredTable = append(filteredTable, filteredRow)
@@ -480,7 +486,7 @@ func parseParagraph(lines []string, i *int) any {
 	text := strings.Join(paraLines, "\n")
 	return map[string]any{
 		"type":    "paragraph",
-		"content": parseInlineWithHardBreaks(text),
+		"content": parseInline(text),
 	}
 }
 
@@ -507,10 +513,6 @@ var (
 )
 
 func parseInline(text string) []any {
-	return parseInlineWithHardBreaks(text)
-}
-
-func parseInlineWithHardBreaks(text string) []any {
 	segments := strings.Split(text, "  \n")
 	var result []any
 	for si, segment := range segments {

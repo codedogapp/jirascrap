@@ -17,7 +17,10 @@ func sanitizeName(name string) (string, error) {
 		return "", fmt.Errorf("tmux name cannot be empty")
 	}
 	if !validName.MatchString(name) {
-		return "", fmt.Errorf("tmux name %q contains invalid characters (allowed: alphanumeric, dot, dash, underscore)", name)
+		return "", fmt.Errorf(
+			"tmux name %q contains invalid characters (allowed: alphanumeric, dot, dash, underscore)",
+			name,
+		)
 	}
 	return name, nil
 }
