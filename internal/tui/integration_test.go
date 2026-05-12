@@ -273,7 +273,7 @@ func TestIntegration_TagPopup(t *testing.T) {
 	// Open tag popup
 	sendKey(t, app, "t")
 
-	if !app.tagModel.IsVisible() {
+	if !app.popups.tag.IsVisible() {
 		t.Fatal("tag popup should be visible after 't'")
 	}
 
@@ -282,7 +282,7 @@ func TestIntegration_TagPopup(t *testing.T) {
 	sendKey(t, app, "u")
 	sendKey(t, app, "g")
 
-	tags := app.tagModel.CurrentTags()
+	tags := app.popups.tag.CurrentTags()
 	if len(tags) != 1 || tags[0] != "bug" {
 		t.Errorf("expected tags=[bug], got %v", tags)
 	}
@@ -300,7 +300,7 @@ func TestIntegration_TodoPopup(t *testing.T) {
 	// Open todo popup
 	sendKey(t, app, "n")
 
-	if !app.todoModel.IsVisible() {
+	if !app.popups.todo.IsVisible() {
 		t.Fatal("todo popup should be visible after 'n'")
 	}
 }
@@ -318,7 +318,7 @@ func TestIntegration_StatusTransition(t *testing.T) {
 	// Open status popup
 	sendKey(t, app, "s")
 
-	if !app.statusModel.IsVisible() {
+	if !app.popups.status.IsVisible() {
 		t.Fatal("status popup should be visible after 's'")
 	}
 
@@ -401,14 +401,14 @@ func TestIntegration_DebugOverlay(t *testing.T) {
 	// Toggle debug
 	sendKey(t, app, "d")
 
-	if !app.debugModel.IsVisible() {
+	if !app.popups.debug.IsVisible() {
 		t.Error("debug overlay should be visible after 'd'")
 	}
 
 	// Toggle off
 	sendKey(t, app, "d")
 
-	if app.debugModel.IsVisible() {
+	if app.popups.debug.IsVisible() {
 		t.Error("debug overlay should hide after second 'd'")
 	}
 }

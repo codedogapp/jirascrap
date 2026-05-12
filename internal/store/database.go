@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/codedogapp/jirascrap/internal/logger"
-	_ "modernc.org/sqlite"
 	"github.com/pressly/goose/v3"
+	_ "modernc.org/sqlite"
 )
 
 const SQLDriver string = "sqlite"

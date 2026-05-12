@@ -32,11 +32,7 @@ type AppModel struct {
 	previousList *views.ListModel
 	navLevel     navLevel
 	activeModel  views.ActiveModel
-	debugModel   *views.DebugModel
-	tagModel     *views.TagModel
-	todoModel    *views.TodoModel
-	statusModel  *views.StatusModel
-	toastModel   *views.ToastModel
+	popups       *PopupManager
 	epicChildren map[string][]model.Ticket
 	err          error
 	syncing      bool
@@ -51,6 +47,11 @@ func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *Ap
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
 	debugModel := views.NewDebugModel(0, 0)
+	tagModel := views.NewTagModel(0, 0, nil)
+	todoModel := views.NewTodoModel(0, 0, "", nil)
+	statusModel := views.NewStatusModel(0, 0)
+	toastModel := views.NewToastModel(0, 0)
+
 	return &AppModel{
 		jiraClient:   client,
 		store:        s,
@@ -58,11 +59,7 @@ func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *Ap
 		list:         listModel,
 		navLevel:     navRoot,
 		activeModel:  listModel,
-		debugModel:   debugModel,
-		tagModel:     views.NewTagModel(0, 0, nil),
-		todoModel:    views.NewTodoModel(0, 0, "", nil),
-		statusModel:  views.NewStatusModel(0, 0),
-		toastModel:   views.NewToastModel(0, 0),
+		popups:       newPopupManager(tagModel, todoModel, statusModel, debugModel, toastModel),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 	}
@@ -123,7 +120,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTransitionsLoaded(msg)
 
 	case transitionsErrorMsg:
-		m.statusModel.Hide()
+		m.popups.status.Hide()
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
 	case views.StatusTransitionMsg:
@@ -136,67 +133,63 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
 	case views.ToastTimeoutMsg:
-		m.toastModel.Hide()
+		m.popups.toast.Hide()
 		return m, nil
 
 	case tea.KeyPressMsg:
-		cmd := m.handleQuit(msg)
-		if cmd != nil {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleDebug(msg); consumed {
-			return m, cmd
-		}
-		// Route keys to popups when active
-		if m.tagModel.IsVisible() {
-			return m.handleTagKey(msg)
-		}
-		if m.todoModel.IsVisible() {
-			return m.handleTodoKey(msg)
-		}
-		if m.statusModel.IsVisible() {
-			return m.handleStatusKey(msg)
-		}
-		if consumed, cmd := m.handleRefresh(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleExitEpic(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleGoHome(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleOpenInBrowser(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleToggleTag(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleToggleTodo(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleToggleStatus(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleSendToCopilot(msg); consumed {
-			return m, cmd
-		}
-		m.activeModel, cmd = m.activeModel.Update(msg)
-		return m, cmd
+		return m.handleKeyPress(msg)
 
 	default:
-		// Route non-key messages to active popup for text input blinking etc.
-		if m.tagModel.IsVisible() {
-			return m, m.tagModel.UpdateMsg(msg)
-		}
-		if m.todoModel.IsVisible() && m.todoModel.IsAdding() {
-			return m, m.todoModel.UpdateMsg(msg)
-		}
-		if mu, ok := m.activeModel.(views.MsgUpdater); ok {
-			return m, mu.UpdateMsg(msg)
-		}
+		return m.handleOtherMsg(msg)
 	}
+}
 
+func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if cmd := m.handleQuit(msg); cmd != nil {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleDebug(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.popups.RouteKeyPress(msg, m); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleRefresh(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleExitEpic(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleGoHome(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleOpenInBrowser(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleToggleTag(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleToggleTodo(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleToggleStatus(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleSendToCopilot(msg); consumed {
+		return m, cmd
+	}
+	var cmd tea.Cmd
+	m.activeModel, cmd = m.activeModel.Update(msg)
+	return m, cmd
+}
+
+func (m *AppModel) handleOtherMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.popups.RouteMsg(msg); handled {
+		return m, cmd
+	}
+	if mu, ok := m.activeModel.(views.MsgUpdater); ok {
+		return m, mu.UpdateMsg(msg)
+	}
 	return m, nil
 }
 
@@ -207,31 +200,10 @@ func (m *AppModel) View() tea.View {
 
 	base := m.styles.App.Render(m.activeModel.View().Content)
 
-	debug := m.debugModel.View()
-	todoOverlay := m.todoModel.View()
-	tagOverlay := m.tagModel.View()
-	statusOverlay := m.statusModel.View()
-	toastOverlay := m.toastModel.View()
-
-	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil || statusOverlay != nil || toastOverlay != nil
-	if hasOverlay {
-		layers := []*lipgloss.Layer{lipgloss.NewLayer(base)}
-		if todoOverlay != nil {
-			layers = append(layers, todoOverlay)
-		}
-		if tagOverlay != nil {
-			layers = append(layers, tagOverlay)
-		}
-		if statusOverlay != nil {
-			layers = append(layers, statusOverlay)
-		}
-		if debug != nil {
-			layers = append(layers, debug)
-		}
-		if toastOverlay != nil {
-			layers = append(layers, toastOverlay)
-		}
-		v := tea.NewView(lipgloss.NewCompositor(layers...).Render())
+	layers := m.popups.Layers()
+	if len(layers) > 0 {
+		all := append([]*lipgloss.Layer{lipgloss.NewLayer(base)}, layers...)
+		v := tea.NewView(lipgloss.NewCompositor(all...).Render())
 		v.AltScreen = true
 		return v
 	}

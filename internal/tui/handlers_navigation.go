@@ -21,19 +21,11 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 		m.previousList.SetSize(msg.Width, msg.Height)
 	}
 
-	m.debugModel.SetSize(msg.Width, msg.Height)
-
 	m.width = msg.Width
 	m.height = msg.Height
 
 	w, h := m.styles.App.GetFrameSize()
-	contentWidth := msg.Width - w
-	contentHeight := msg.Height - h
-
-	m.tagModel.SetSize(contentWidth, contentHeight)
-	m.todoModel.SetSize(contentWidth, contentHeight)
-	m.statusModel.SetSize(contentWidth, contentHeight)
-	m.toastModel.SetSize(msg.Width, msg.Height)
+	m.popups.SetSize(msg.Width-w, msg.Height-h, msg.Width, msg.Height)
 
 	return m, nil
 }
@@ -218,30 +210,30 @@ func (m *AppModel) handleQuit(msg tea.KeyPressMsg) tea.Cmd {
 
 func (m *AppModel) handleDebug(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if key.Matches(msg, keymaps.DefaultKeyMap.ToggleDebug) && !m.isPopupActive() {
-		if m.debugModel.IsVisible() {
-			m.debugModel.Hide()
+		if m.popups.debug.IsVisible() {
+			m.popups.debug.Hide()
 		} else {
-			m.debugModel.Show()
+			m.popups.debug.Show()
 		}
 		return true, nil
 	}
 
-	isVisible := m.debugModel.IsVisible()
+	isVisible := m.popups.debug.IsVisible()
 
 	if key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && isVisible {
-		m.debugModel.Hide()
+		m.popups.debug.Hide()
 		return true, nil
 	}
 
 	if isVisible {
-		return true, m.debugModel.Update(msg)
+		return true, m.popups.debug.Update(msg)
 	}
 
 	return false, nil
 }
 
 func (m *AppModel) isPopupActive() bool {
-	return m.tagModel.IsVisible() || m.todoModel.IsVisible() || m.statusModel.IsVisible()
+	return m.popups.IsActive()
 }
 
 func (m *AppModel) selectedTicket() (model.Ticket, bool) {

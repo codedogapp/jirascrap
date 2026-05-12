@@ -72,15 +72,16 @@ func newHandlerTestApp(tickets []model.Ticket) *AppModel {
 	styles := views.NewStyles()
 	list := views.NewListModel(tickets, styles.App)
 	list.SetSize(120, 40)
+	tagModel := views.NewTagModel(80, 30, nil)
+	todoModel := views.NewTodoModel(80, 30, "", nil)
+	statusModel := views.NewStatusModel(80, 30)
+	toastModel := views.NewToastModel(120, 40)
+	debugModel := views.NewDebugModel(120, 40)
 	return &AppModel{
 		store:        &mockStore{tickets: tickets},
 		list:         list,
 		activeModel:  list,
-		tagModel:     views.NewTagModel(80, 30, nil),
-		todoModel:    views.NewTodoModel(80, 30, "", nil),
-		statusModel:  views.NewStatusModel(80, 30),
-		toastModel:   views.NewToastModel(120, 40),
-		debugModel:   views.NewDebugModel(120, 40),
+		popups:       newPopupManager(tagModel, todoModel, statusModel, debugModel, toastModel),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 		width:        120,
@@ -114,7 +115,7 @@ func TestIsPopupActive_OnDetail_NoPopup(t *testing.T) {
 
 func TestIsPopupActive_StatusVisible(t *testing.T) {
 	app := newHandlerTestApp(nil)
-	app.statusModel.Show(model.Ticket{ID: "T-1", Summary: "test"})
+	app.popups.status.Show(model.Ticket{ID: "T-1", Summary: "test"})
 
 	if !app.isPopupActive() {
 		t.Error("expected true when status dropdown is visible")

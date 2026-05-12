@@ -19,10 +19,10 @@ type DebugModel struct {
 }
 
 const (
-	RatioWidth       = 2
-	RatioHeight      = 3
-	PopupWidthScale  = 0.7 // fraction of content width for popup overlays
-	todoHeightRatio  = 2
+	RatioWidth      = 2
+	RatioHeight     = 3
+	PopupWidthScale = 0.7 // fraction of content width for popup overlays
+	todoHeightRatio = 2
 )
 
 func NewDebugModel(width int, height int) *DebugModel {

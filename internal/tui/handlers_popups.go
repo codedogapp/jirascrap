@@ -16,30 +16,30 @@ import (
 func (m *AppModel) handleTagKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
-		m.tagModel.Hide()
+		m.popups.tag.Hide()
 		return m, nil
 
 	case key.Matches(msg, keymaps.DefaultKeyMap.Select):
-		id := m.tagModel.TicketID()
-		tags := m.tagModel.CurrentTags()
-		m.tagModel.Hide()
+		id := m.popups.tag.TicketID()
+		tags := m.popups.tag.CurrentTags()
+		m.popups.tag.Hide()
 		return m, func() tea.Msg {
 			return views.TagsFilledMsg{ID: id, Tags: tags}
 		}
 
 	default:
-		return m, m.tagModel.Update(msg)
+		return m, m.popups.tag.Update(msg)
 	}
 }
 
 func (m *AppModel) handleTodoKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && !m.todoModel.IsAdding():
-		m.todoModel.Hide()
+	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && !m.popups.todo.IsAdding():
+		m.popups.todo.Hide()
 		return m, nil
 
 	default:
-		return m, m.todoModel.Update(msg)
+		return m, m.popups.todo.Update(msg)
 	}
 }
 
@@ -57,9 +57,9 @@ func (m *AppModel) handleToggleTag(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to load tags: %v", err))
 	}
-	m.tagModel.SetAllTags(allTags)
+	m.popups.tag.SetAllTags(allTags)
 
-	return true, m.tagModel.Show(ticket)
+	return true, m.popups.tag.Show(ticket)
 }
 
 func (m *AppModel) handleToggleTodo(msg tea.KeyPressMsg) (bool, tea.Cmd) {
@@ -72,8 +72,8 @@ func (m *AppModel) handleToggleTodo(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	if m.todoModel.IsVisible() {
-		m.todoModel.Hide()
+	if m.popups.todo.IsVisible() {
+		m.popups.todo.Hide()
 		return true, nil
 	}
 
@@ -82,8 +82,8 @@ func (m *AppModel) handleToggleTodo(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		logger.Log.Warn(fmt.Sprintf("failed to load todos: %v", err))
 	}
 	w, h := m.styles.App.GetFrameSize()
-	m.todoModel = views.NewTodoModel(m.width-w, m.height-h, ticket.ID, todos)
-	m.todoModel.Show()
+	m.popups.todo = views.NewTodoModel(m.width-w, m.height-h, ticket.ID, todos)
+	m.popups.todo.Show()
 
 	return true, nil
 }
@@ -103,7 +103,7 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 	if err != nil {
 		logger.Log.Warn(fmt.Sprintf("failed to load tags after save: %v", err))
 	}
-	m.tagModel.SetAllTags(allTags)
+	m.popups.tag.SetAllTags(allTags)
 
 	if dm, ok := m.activeDetailModel(); ok {
 		if ticket, ok := m.findTicket(msg.id); ok {
@@ -145,7 +145,7 @@ func (m *AppModel) handleToggleStatus(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	m.statusModel.Show(ticket)
+	m.popups.status.Show(ticket)
 	return true, m.fetchTransitionsCmd(ticket.ID)
 }
 
@@ -163,15 +163,15 @@ func (m *AppModel) fetchTransitionsCmd(issueKey string) tea.Cmd {
 
 func (m *AppModel) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, keymaps.DefaultKeyMap.GoBack) {
-		m.statusModel.Hide()
+		m.popups.status.Hide()
 		return m, nil
 	}
 
-	return m, m.statusModel.Update(msg)
+	return m, m.popups.status.Update(msg)
 }
 
 func (m *AppModel) handleTransitionsLoaded(msg transitionsLoadedMsg) (tea.Model, tea.Cmd) {
-	m.statusModel.SetTransitions(msg.transitions)
+	m.popups.status.SetTransitions(msg.transitions)
 	return m, nil
 }
 
@@ -198,7 +198,7 @@ func (m *AppModel) doTransitionCmd(issueKey string, transition jira.Transition) 
 func (m *AppModel) handleStatusTransitionComplete(msg statusTransitionCompleteMsg) (tea.Model, tea.Cmd) {
 	m.updateTicketStatus(msg.ticketID, msg.newStatus, msg.newStatusCategory)
 
-	toastCmd := m.toastModel.Show(fmt.Sprintf("→ %s", msg.newStatus))
+	toastCmd := m.popups.toast.Show(fmt.Sprintf("→ %s", msg.newStatus))
 
 	return m, tea.Batch(toastCmd, m.syncFromJira())
 }

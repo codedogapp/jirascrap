@@ -163,10 +163,10 @@ func buildCopilotPrompt(ticket model.Ticket, todos []model.Todo) string {
 
 func (m *AppModel) handleCopilotLaunched(msg copilotLaunchedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
-		return m, m.toastModel.Show(fmt.Sprintf("✗ %s", msg.err))
+		return m, m.popups.toast.Show(fmt.Sprintf("✗ %s", msg.err))
 	}
 
-	return m, m.toastModel.Show(
+	return m, m.popups.toast.Show(
 		fmt.Sprintf("✓ Copilot launched for %s — tmux attach -t %s", msg.ticketID, copilotSession.Name),
 	)
 }
