@@ -44,7 +44,7 @@ func TestLogger_BasicLevels(t *testing.T) {
 
 func TestLogger_MaxLogs(t *testing.T) {
 	l := newTestLogger()
-	for i := 0; i < 150; i++ {
+	for i := range 150 {
 		l.Info(fmt.Sprintf("msg-%d", i))
 	}
 
@@ -93,7 +93,7 @@ func TestLogger_Concurrent(t *testing.T) {
 	l := newTestLogger()
 	var wg sync.WaitGroup
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()

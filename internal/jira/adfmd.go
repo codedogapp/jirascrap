@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	adfBulletList  = "bulletList"
+	adfOrderedList = "orderedList"
+)
+
 // ADFToMarkdown converts an ADF document to Markdown text
 func ADFToMarkdown(node any) string {
 	return adfToMarkdown(node)
@@ -67,14 +72,14 @@ func blockToMarkdown(node any, indent int, depth int) string {
 		text = strings.ReplaceAll(text, "**", "")
 		return prefix + strings.Repeat("#", level) + " " + text
 
-	case "bulletList":
+	case adfBulletList:
 		var items []string
 		for _, item := range content {
 			items = append(items, listItemToMarkdown(item, indent, "- ", depth+1))
 		}
 		return strings.Join(items, "\n")
 
-	case "orderedList":
+	case adfOrderedList:
 		var items []string
 		for i, item := range content {
 			marker := fmt.Sprintf("%d. ", i+1)
@@ -142,7 +147,7 @@ func listItemToMarkdown(node any, indent int, marker string, depth int) string {
 			} else {
 				parts = append(parts, strings.Repeat(" ", contIndent)+text)
 			}
-		case "bulletList", "orderedList":
+		case adfBulletList, adfOrderedList:
 			parts = append(parts, blockToMarkdown(child, contIndent, depth+1))
 		default:
 			parts = append(parts, blockToMarkdown(child, contIndent, depth+1))
@@ -271,7 +276,7 @@ func tableToMarkdown(rows []any, indent int) string {
 	// Remove empty columns (glamour is weird with them)
 	headerLen := len(table[0])
 	emptyColumns := map[int]bool{}
-	for col := 0; col < headerLen; col++ {
+	for col := range headerLen {
 		empty := true
 		for _, row := range table[1:] {
 			if col < len(row) && row[col] != "" {
@@ -287,7 +292,7 @@ func tableToMarkdown(rows []any, indent int) string {
 	var filteredTable [][]string
 	for _, row := range table {
 		var filteredRow []string
-		for i := 0; i < headerLen; i++ {
+		for i := range headerLen {
 			if emptyColumns[i] {
 				continue
 			}
@@ -619,10 +624,10 @@ func parseInlineSegment(text string) []any {
 }
 
 func parseList(lines []string, idx *int, listType string) map[string]any {
-	adfType := "bulletList"
+	adfType := adfBulletList
 	markerRe := bulletMarkerRe
 	if listType == "ordered" {
-		adfType = "orderedList"
+		adfType = adfOrderedList
 		markerRe = orderedMarkerRe
 	}
 
