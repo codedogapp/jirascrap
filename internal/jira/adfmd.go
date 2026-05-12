@@ -17,6 +17,9 @@ func MarkdownToADF(md string) any {
 	return markdownToADF(md)
 }
 
+// maxADFDepth limits recursion depth to prevent stack overflow on deeply nested documents.
+const maxADFDepth = 50
+
 func adfToMarkdown(node any) string {
 	doc, ok := node.(map[string]any)
 	if !ok {
@@ -28,7 +31,7 @@ func adfToMarkdown(node any) string {
 	}
 	var parts []string
 	for _, child := range content {
-		if s := blockToMarkdown(child, 0); s != "" {
+		if s := blockToMarkdown(child, 0, 0); s != "" {
 			parts = append(parts, s)
 		}
 	}
@@ -36,7 +39,10 @@ func adfToMarkdown(node any) string {
 }
 
 //nolint:gocognit
-func blockToMarkdown(node any, indent int) string {
+func blockToMarkdown(node any, indent int, depth int) string {
+	if depth > maxADFDepth {
+		return ""
+	}
 	block, ok := node.(map[string]any)
 	if !ok {
 		return ""
@@ -64,7 +70,7 @@ func blockToMarkdown(node any, indent int) string {
 	case "bulletList":
 		var items []string
 		for _, item := range content {
-			items = append(items, listItemToMarkdown(item, indent, "- "))
+			items = append(items, listItemToMarkdown(item, indent, "- ", depth+1))
 		}
 		return strings.Join(items, "\n")
 
@@ -72,7 +78,7 @@ func blockToMarkdown(node any, indent int) string {
 		var items []string
 		for i, item := range content {
 			marker := fmt.Sprintf("%d. ", i+1)
-			items = append(items, listItemToMarkdown(item, indent, marker))
+			items = append(items, listItemToMarkdown(item, indent, marker, depth+1))
 		}
 		return strings.Join(items, "\n")
 
@@ -87,7 +93,7 @@ func blockToMarkdown(node any, indent int) string {
 	case "blockquote":
 		var lines []string
 		for _, child := range content {
-			md := blockToMarkdown(child, 0)
+			md := blockToMarkdown(child, 0, depth+1)
 			for _, line := range strings.Split(md, "\n") {
 				lines = append(lines, prefix+"> "+line)
 			}
@@ -105,7 +111,10 @@ func blockToMarkdown(node any, indent int) string {
 	}
 }
 
-func listItemToMarkdown(node any, indent int, marker string) string {
+func listItemToMarkdown(node any, indent int, marker string, depth int) string {
+	if depth > maxADFDepth {
+		return ""
+	}
 	item, ok := node.(map[string]any)
 	if !ok {
 		return ""
@@ -134,9 +143,9 @@ func listItemToMarkdown(node any, indent int, marker string) string {
 				parts = append(parts, strings.Repeat(" ", contIndent)+text)
 			}
 		case "bulletList", "orderedList":
-			parts = append(parts, blockToMarkdown(child, contIndent))
+			parts = append(parts, blockToMarkdown(child, contIndent, depth+1))
 		default:
-			parts = append(parts, blockToMarkdown(child, contIndent))
+			parts = append(parts, blockToMarkdown(child, contIndent, depth+1))
 		}
 	}
 	return strings.Join(parts, "\n")

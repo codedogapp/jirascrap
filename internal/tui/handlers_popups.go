@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -98,34 +97,11 @@ func (m *AppModel) handleTodosChanged(msg views.TodosChangedMsg) (tea.Model, tea
 }
 
 func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
-	// Re-read tickets and epic children with fresh tags from DB
-	tickets, err := m.store.GetCachedTickets()
+	m.refreshListsFromDB()
+
+	allTags, err := m.store.GetUniqueTags()
 	if err != nil {
-		logger.Log.Warn(fmt.Sprintf("failed to re-read tickets after tag save: %v", err))
-	} else {
-		m.rootList().SetItems(tickets)
-	}
-
-	epicChildren, err := m.store.GetAllCachedEpicChildren()
-	if err != nil {
-		logger.Log.Warn(fmt.Sprintf("failed to re-read epic children after tag save: %v", err))
-	} else {
-		m.epicChildren = epicChildren
-	}
-
-	// Refresh current epic view if inside one
-	if m.previousList != nil {
-		for epicKey, children := range epicChildren {
-			if strings.HasPrefix(m.list.Title(), fmt.Sprintf("⚡ %s", epicKey)) {
-				m.list.SetItems(children)
-				break
-			}
-		}
-	}
-
-	allTags, err2 := m.store.GetUniqueTags()
-	if err2 != nil {
-		logger.Log.Warn(fmt.Sprintf("failed to load tags after save: %v", err2))
+		logger.Log.Warn(fmt.Sprintf("failed to load tags after save: %v", err))
 	}
 	m.tagModel.SetAllTags(allTags)
 
@@ -175,7 +151,9 @@ func (m *AppModel) handleToggleStatus(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 func (m *AppModel) fetchTransitionsCmd(issueKey string) tea.Cmd {
 	return func() tea.Msg {
-		transitions, err := m.jiraClient.FetchTransitions(context.Background(), issueKey)
+		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+		defer cancel()
+		transitions, err := m.jiraClient.FetchTransitions(ctx, issueKey)
 		if err != nil {
 			return transitionsErrorMsg{err: err}
 		}
@@ -203,7 +181,9 @@ func (m *AppModel) handleStatusTransition(msg views.StatusTransitionMsg) (tea.Mo
 
 func (m *AppModel) doTransitionCmd(issueKey string, transition jira.Transition) tea.Cmd {
 	return func() tea.Msg {
-		err := m.jiraClient.DoTransition(context.Background(), issueKey, transition.ID)
+		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+		defer cancel()
+		err := m.jiraClient.DoTransition(ctx, issueKey, transition.ID)
 		if err != nil {
 			return statusTransitionErrorMsg{err: err}
 		}
@@ -236,9 +216,7 @@ func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory str
 	}
 
 	if root := m.rootList(); root != nil {
-		if t, ok := root.FindTicket(ticketID); ok {
-			t.Status = newStatus
-			t.StatusCategory = newStatusCategory
+		if _, ok := root.FindTicket(ticketID); ok {
 			tickets, err := m.store.GetCachedTickets()
 			if err != nil {
 				logger.Log.Warn(fmt.Sprintf("failed to re-read tickets for status update: %v", err))
@@ -253,15 +231,7 @@ func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory str
 		m.epicChildren[epicKey] = update(children)
 	}
 
-	// Update current epic list view if inside one
-	if m.previousList != nil {
-		for epicKey, children := range m.epicChildren {
-			if strings.HasPrefix(m.list.Title(), fmt.Sprintf("⚡ %s", epicKey)) {
-				m.list.SetItems(children)
-				break
-			}
-		}
-	}
+	m.refreshCurrentEpicView()
 
 	// Update detail view if showing this ticket
 	if dm, ok := m.activeDetailModel(); ok {

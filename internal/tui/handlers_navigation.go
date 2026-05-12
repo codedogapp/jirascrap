@@ -76,7 +76,9 @@ func (m *AppModel) showEpicChildren(epicKey string, tickets []model.Ticket) (tea
 
 func (m *AppModel) fetchEpicChildrenCmd(epicKey string) tea.Cmd {
 	return func() tea.Msg {
-		tickets, err := m.jiraClient.FetchEpicChildren(context.Background(), epicKey)
+		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+		defer cancel()
+		tickets, err := m.jiraClient.FetchEpicChildren(ctx, epicKey)
 		if err != nil {
 			return epicChildrenErrorMsg{err: err}
 		}
@@ -170,6 +172,38 @@ func (m *AppModel) findTicket(id string) (model.Ticket, bool) {
 func (m *AppModel) activeDetailModel() (*views.DetailModel, bool) {
 	dm, ok := m.activeModel.(*views.DetailModel)
 	return dm, ok
+}
+
+// refreshListsFromDB re-reads tickets and epic children from DB, then updates all list views.
+func (m *AppModel) refreshListsFromDB() {
+	tickets, err := m.store.GetCachedTickets()
+	if err != nil {
+		logger.Log.Warn(fmt.Sprintf("failed to re-read tickets from DB: %v", err))
+	} else {
+		m.rootList().SetItems(tickets)
+	}
+
+	epicChildren, err := m.store.GetAllCachedEpicChildren()
+	if err != nil {
+		logger.Log.Warn(fmt.Sprintf("failed to re-read epic children from DB: %v", err))
+	} else {
+		m.epicChildren = epicChildren
+	}
+
+	m.refreshCurrentEpicView()
+}
+
+// refreshCurrentEpicView updates the current epic list view if user is inside one.
+func (m *AppModel) refreshCurrentEpicView() {
+	if m.previousList == nil {
+		return
+	}
+	for epicKey, children := range m.epicChildren {
+		if strings.HasPrefix(m.list.Title(), fmt.Sprintf("⚡ %s", epicKey)) {
+			m.list.SetItems(children)
+			break
+		}
+	}
 }
 
 func (m *AppModel) handleQuit(msg tea.KeyPressMsg) tea.Cmd {

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -10,6 +11,8 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
+
+const apiTimeout = 30 * time.Second
 
 func (m *AppModel) loadCachedTickets() tea.Cmd {
 	return func() tea.Msg {
@@ -31,7 +34,10 @@ func (m *AppModel) loadCachedTickets() tea.Cmd {
 
 func (m *AppModel) syncFromJira() tea.Cmd {
 	return func() tea.Msg {
-		tickets, err := m.jiraClient.FetchTickets(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+		defer cancel()
+
+		tickets, err := m.jiraClient.FetchTickets(ctx)
 		if err != nil {
 			return syncErrorMsg{err: err}
 		}
@@ -39,7 +45,10 @@ func (m *AppModel) syncFromJira() tea.Cmd {
 			logger.Log.Warn(fmt.Sprintf("failed to cache tickets: %v", err))
 		}
 
-		epicChildren, err := m.jiraClient.FetchAllEpicChildren(context.Background(), tickets)
+		epicCtx, epicCancel := context.WithTimeout(context.Background(), apiTimeout)
+		defer epicCancel()
+
+		epicChildren, err := m.jiraClient.FetchAllEpicChildren(epicCtx, tickets)
 		if err != nil {
 			logger.Log.Warn(fmt.Sprintf("failed to fetch some epic children: %v", err))
 		}

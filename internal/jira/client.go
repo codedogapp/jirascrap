@@ -317,7 +317,12 @@ func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticke
 	for _, t := range epics {
 		sem <- struct{}{}
 		go func(epicKey string) {
-			defer func() { <-sem }()
+			defer func() {
+				<-sem
+				if r := recover(); r != nil {
+					ch <- result{epicKey: epicKey, err: fmt.Errorf("panic fetching epic %s: %v", epicKey, r)}
+				}
+			}()
 			children, err := c.FetchEpicChildren(ctx, epicKey)
 			ch <- result{epicKey: epicKey, children: children, err: err}
 		}(t.ID)

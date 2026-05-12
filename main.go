@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/codedogapp/jirascrap/internal/config"
 	"github.com/codedogapp/jirascrap/internal/jira"
@@ -25,6 +28,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer sqliteDB.Close()
+
+	// Ensure DB is closed on unexpected signals
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		sqliteDB.Close()
+	}()
 
 	metaStore := store.NewSqliteMetaStore(sqliteDB.DB)
 

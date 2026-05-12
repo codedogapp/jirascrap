@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/codedogapp/jirascrap/internal/logger"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/pressly/goose/v3"
 )
 
-const SQLDriver string = "sqlite3"
+const SQLDriver string = "sqlite"
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS

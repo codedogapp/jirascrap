@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/pressly/goose/v3"
 
 	"github.com/codedogapp/jirascrap/internal/model"
@@ -13,7 +13,7 @@ import (
 
 func setupTestDB(t *testing.T) *SqliteMetaStore {
 	t.Helper()
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -22,7 +22,7 @@ func setupTestDB(t *testing.T) *SqliteMetaStore {
 	})
 
 	goose.SetBaseFS(embedMigrations)
-	if err := goose.SetDialect("sqlite3"); err != nil {
+	if err := goose.SetDialect("sqlite"); err != nil {
 		t.Fatalf("set dialect: %v", err)
 	}
 	goose.SetLogger(goose.NopLogger())
