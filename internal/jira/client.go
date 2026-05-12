@@ -11,14 +11,11 @@
 package jira
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/codedogapp/jirascrap/internal/config"
@@ -26,11 +23,6 @@ import (
 )
 
 const defaultJQL = `assignee = currentUser() AND statusCategory != Done AND status != 'TO DESCRIBE' ORDER BY status DESC`
-
-const (
-	maxRetries     = 3
-	initialBackoff = 500 * time.Millisecond
-)
 
 // TicketClient defines the operations used by the TUI to interact with Jira.
 type TicketClient interface {
@@ -41,24 +33,7 @@ type TicketClient interface {
 	DoTransition(ctx context.Context, issueKey string, transitionID string) error
 }
 
-// ClientOption configures a Client.
-type ClientOption func(*Client)
-
-// WithTimeout sets the HTTP client timeout (default: 15s).
-func WithTimeout(d time.Duration) ClientOption {
-	return func(c *Client) { c.http.Timeout = d }
-}
-
-// WithMaxResults sets the max results per Jira search (default: 100).
-func WithMaxResults(n int) ClientOption {
-	return func(c *Client) { c.maxResults = n }
-}
-
-// WithMaxConcurrent sets max concurrent epic fetches (default: 5).
-func WithMaxConcurrent(n int) ClientOption {
-	return func(c *Client) { c.maxConcurrent = n }
-}
-
+// Client is the Jira REST API v3 client.
 type Client struct {
 	domain        string
 	email         string
@@ -68,136 +43,14 @@ type Client struct {
 	maxConcurrent int
 }
 
-func NewClient(cfg *config.Config, opts ...ClientOption) *Client {
-	c := &Client{
+func NewClient(cfg *config.Config) *Client {
+	return &Client{
 		domain:        cfg.Domain,
 		email:         cfg.Email,
 		token:         cfg.APIToken,
 		http:          &http.Client{Timeout: 15 * time.Second},
 		maxResults:    100,
 		maxConcurrent: 5,
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
-}
-
-// doRequest executes an authenticated request with retry for transient failures.
-// Retries on 429 (rate limit) and 5xx errors with exponential backoff.
-func (c *Client) doRequest(ctx context.Context, method, url string, body any, acceptedStatus ...int) ([]byte, error) {
-	var jsonBytes []byte
-	if body != nil {
-		var err error
-		jsonBytes, err = json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request: %w", err)
-		}
-	}
-
-	if len(acceptedStatus) == 0 {
-		acceptedStatus = []int{http.StatusOK}
-	}
-
-	var lastErr error
-	backoff := initialBackoff
-
-	for attempt := range maxRetries {
-		var reqBody io.Reader
-		if jsonBytes != nil {
-			reqBody = bytes.NewReader(jsonBytes)
-		}
-
-		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Accept", "application/json")
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-		req.SetBasicAuth(c.email, c.token)
-
-		resp, err := c.http.Do(req)
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return nil, fmt.Errorf("request cancelled: %w", err)
-			}
-			lastErr = fmt.Errorf("network error: %w", err)
-			if attempt < maxRetries-1 {
-				if err := sleepWithContext(ctx, backoff); err != nil {
-					return nil, lastErr
-				}
-				backoff *= 2
-			}
-			continue
-		}
-
-		respBody, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		if resp.StatusCode == http.StatusTooManyRequests {
-			lastErr = fmt.Errorf("jira api rate limited [429]")
-			if attempt < maxRetries-1 {
-				wait := retryAfterDuration(resp, backoff)
-				if err := sleepWithContext(ctx, wait); err != nil {
-					return nil, lastErr
-				}
-				backoff *= 2
-			}
-			continue
-		}
-
-		if resp.StatusCode >= 500 {
-			lastErr = fmt.Errorf("jira api error [%d]: %s", resp.StatusCode, string(respBody))
-			if attempt < maxRetries-1 {
-				if err := sleepWithContext(ctx, backoff); err != nil {
-					return nil, lastErr
-				}
-				backoff *= 2
-			}
-			continue
-		}
-
-		accepted := false
-		for _, s := range acceptedStatus {
-			if resp.StatusCode == s {
-				accepted = true
-				break
-			}
-		}
-		if !accepted {
-			return nil, fmt.Errorf("jira api error [%d]: %s", resp.StatusCode, string(respBody))
-		}
-
-		if readErr != nil {
-			return nil, fmt.Errorf("failed to read response: %w", readErr)
-		}
-		return respBody, nil
-	}
-
-	return nil, lastErr
-}
-
-// retryAfterDuration parses the Retry-After header, falling back to the given default.
-func retryAfterDuration(resp *http.Response, fallback time.Duration) time.Duration {
-	if v := resp.Header.Get("Retry-After"); v != "" {
-		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
-			return time.Duration(secs) * time.Second
-		}
-	}
-	return fallback
-}
-
-func sleepWithContext(ctx context.Context, d time.Duration) error {
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
 	}
 }
 
@@ -272,12 +125,15 @@ func (c *Client) FetchTransitions(ctx context.Context, issueKey string) ([]Trans
 
 	var transitions []Transition
 	for _, t := range result.Transitions {
-		transitions = append(transitions, Transition{
-			ID:               t.ID,
-			Name:             t.Name,
-			ToStatus:         t.To.Name,
-			ToStatusCategory: t.To.StatusCategory.Name,
-		})
+		transitions = append(
+			transitions,
+			Transition{
+				ID:               t.ID,
+				Name:             t.Name,
+				ToStatus:         t.To.Name,
+				ToStatusCategory: t.To.StatusCategory.Name,
+			},
+		)
 	}
 
 	return transitions, nil
@@ -286,9 +142,13 @@ func (c *Client) FetchTransitions(ctx context.Context, issueKey string) ([]Trans
 func (c *Client) DoTransition(ctx context.Context, issueKey string, transitionID string) error {
 	url := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.domain, issueKey)
 
-	_, err := c.doRequest(ctx, "POST", url,
+	_, err := c.doRequest(
+		ctx,
+		"POST",
+		url,
 		transitionRequest{Transition: transitionRef{ID: transitionID}},
-		http.StatusOK, http.StatusNoContent,
+		http.StatusOK,
+		http.StatusNoContent,
 	)
 	return err
 }

@@ -7,7 +7,7 @@ import (
 
 // TagStore manages ticket tags/labels.
 type TagStore interface {
-	SaveMeta(id string, tags []string) error
+	SaveTags(id string, tags []string) error
 	GetUniqueTags() ([]string, error)
 }
 
@@ -20,7 +20,7 @@ func NewSqliteTagStore(db *sql.DB) *SqliteTagStore {
 	return &SqliteTagStore{db: db}
 }
 
-func (s *SqliteTagStore) SaveMeta(id string, tags []string) error {
+func (s *SqliteTagStore) SaveTags(id string, tags []string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("save tags for %s: begin tx: %w", id, err)

@@ -45,7 +45,7 @@ func NewDebugModel(width int, height int) *DebugModel {
 
 func (m *DebugModel) Show() {
 	m.visible = true
-	m.viewport.SetContent(formatLogs())
+	m.viewport.SetContent(m.formatLogs())
 }
 
 func (m *DebugModel) Hide() {
@@ -78,7 +78,7 @@ func (m *DebugModel) View() *lipgloss.Layer {
 }
 
 func (m *DebugModel) Update(msg tea.KeyPressMsg) tea.Cmd {
-	m.viewport.SetContent(formatLogs())
+	m.viewport.SetContent(m.formatLogs())
 	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
 	return cmd
@@ -95,9 +95,13 @@ func (m *DebugModel) IsVisible() bool {
 	return m.visible
 }
 
-func formatLogs() string {
+func (m *DebugModel) formatLogs() string {
 	var sb strings.Builder
 	entries := logger.Log.Logs()
+	maxWidth := m.viewport.Width() - 2 // account for border padding
+	if maxWidth < 10 {
+		maxWidth = 10
+	}
 	for i, entry := range entries {
 		log := fmt.Sprintf(
 			"[%s] %s",
@@ -105,9 +109,11 @@ func formatLogs() string {
 			entry.Message,
 		)
 
+		wrapped := ansi.Wordwrap(log, maxWidth, "")
+
 		styledLog := lipgloss.NewStyle().
 			Foreground(getColor(entry.Level)).
-			Render(log)
+			Render(wrapped)
 		sb.WriteString(styledLog)
 
 		if i != len(entries)-1 {

@@ -33,18 +33,23 @@ func scanTicketWithTags(row rowScanner) (model.Ticket, error) {
 	); err != nil {
 		return model.Ticket{}, err
 	}
-	var err2 error
-	t.CreatedAt, err2 = parseTime(createdAt)
-	if err2 != nil {
-		return model.Ticket{}, fmt.Errorf("scan ticket: %w", err2)
+
+	var err error
+
+	t.CreatedAt, err = parseTime(createdAt)
+	if err != nil {
+		return model.Ticket{}, fmt.Errorf("scan ticket: %w", err)
 	}
-	t.UpdatedAt, err2 = parseTime(updatedAt)
-	if err2 != nil {
-		return model.Ticket{}, fmt.Errorf("scan ticket: %w", err2)
+
+	t.UpdatedAt, err = parseTime(updatedAt)
+	if err != nil {
+		return model.Ticket{}, fmt.Errorf("scan ticket: %w", err)
 	}
+
 	if tags.Valid && tags.String != "" {
 		t.Tags = strings.Split(tags.String, ",")
 	}
+
 	return t, nil
 }
 

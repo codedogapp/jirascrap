@@ -19,7 +19,7 @@ type mockStore struct {
 	cacheErr     error
 }
 
-func (m *mockStore) SaveMeta(id string, tags []string) error {
+func (m *mockStore) SaveTags(id string, tags []string) error {
 	return nil
 }
 

@@ -14,7 +14,7 @@ func TestSaveMeta_TagsJoinedInGetCachedTickets(t *testing.T) {
 	_ = s.Tickets.CacheTickets([]model.Ticket{
 		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
 	})
-	if err := s.Tags.SaveMeta("TICK-1", []string{"bug", "urgent"}); err != nil {
+	if err := s.Tags.SaveTags("TICK-1", []string{"bug", "urgent"}); err != nil {
 		t.Fatalf("SaveMeta: %v", err)
 	}
 
@@ -37,8 +37,8 @@ func TestSaveMeta_Overwrite(t *testing.T) {
 	_ = s.Tickets.CacheTickets([]model.Ticket{
 		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
 	})
-	_ = s.Tags.SaveMeta("TICK-1", []string{"old-tag"})
-	_ = s.Tags.SaveMeta("TICK-1", []string{"new-tag"})
+	_ = s.Tags.SaveTags("TICK-1", []string{"old-tag"})
+	_ = s.Tags.SaveTags("TICK-1", []string{"new-tag"})
 
 	tickets, _ := s.Tickets.GetCachedTickets()
 	if len(tickets[0].Tags) != 1 || tickets[0].Tags[0] != "new-tag" {
@@ -53,8 +53,8 @@ func TestSaveMeta_EmptyTags(t *testing.T) {
 	_ = s.Tickets.CacheTickets([]model.Ticket{
 		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
 	})
-	_ = s.Tags.SaveMeta("TICK-1", []string{"tag"})
-	_ = s.Tags.SaveMeta("TICK-1", []string{})
+	_ = s.Tags.SaveTags("TICK-1", []string{"tag"})
+	_ = s.Tags.SaveTags("TICK-1", []string{})
 
 	tickets, _ := s.Tickets.GetCachedTickets()
 	if tickets[0].Tags != nil {
@@ -70,8 +70,8 @@ func TestSaveMeta_MultipleTickets(t *testing.T) {
 		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
 		{ID: "TICK-2", Summary: "Second", Type: "Task", CreatedAt: now, UpdatedAt: now},
 	})
-	_ = s.Tags.SaveMeta("TICK-1", []string{"a"})
-	_ = s.Tags.SaveMeta("TICK-2", []string{"b", "c"})
+	_ = s.Tags.SaveTags("TICK-1", []string{"a"})
+	_ = s.Tags.SaveTags("TICK-2", []string{"b", "c"})
 
 	tickets, _ := s.Tickets.GetCachedTickets()
 	tagged := 0
@@ -88,8 +88,8 @@ func TestSaveMeta_MultipleTickets(t *testing.T) {
 func TestGetUniqueTags(t *testing.T) {
 	s := setupTestDB(t)
 
-	_ = s.Tags.SaveMeta("TICK-1", []string{"bug", "urgent"})
-	_ = s.Tags.SaveMeta("TICK-2", []string{"bug", "feature"})
+	_ = s.Tags.SaveTags("TICK-1", []string{"bug", "urgent"})
+	_ = s.Tags.SaveTags("TICK-2", []string{"bug", "feature"})
 
 	tags, err := s.Tags.GetUniqueTags()
 	if err != nil {

@@ -116,7 +116,7 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) saveTagsCmd(id string, tags []string) tea.Cmd {
 	return func() tea.Msg {
-		err := m.tagStore.SaveMeta(id, tags)
+		err := m.tagStore.SaveTags(id, tags)
 		if err != nil {
 			return views.ErrMsg{Err: err}
 		}

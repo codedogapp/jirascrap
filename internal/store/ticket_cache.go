@@ -41,7 +41,7 @@ func (s *SqliteTicketCache) CacheTickets(tickets []model.Ticket) error {
 	}
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO tickets (
+		INSERT OR REPLACE INTO tickets (
 			id, 
 		 	summary,
 			reporter, 

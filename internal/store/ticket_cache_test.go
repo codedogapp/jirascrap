@@ -131,7 +131,7 @@ func TestCacheTickets_PreservesLocalMeta(t *testing.T) {
 	s := setupTestDB(t)
 	now := time.Now().Truncate(time.Second)
 
-	_ = s.Tags.SaveMeta("TICK-1", []string{"important"})
+	_ = s.Tags.SaveTags("TICK-1", []string{"important"})
 
 	_ = s.Tickets.CacheTickets([]model.Ticket{
 		{ID: "TICK-1", Summary: "x", CreatedAt: now, UpdatedAt: now},
