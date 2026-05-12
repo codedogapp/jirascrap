@@ -484,15 +484,17 @@ func isBlockBreak(trimmed string) bool {
 }
 
 var (
-	headingRe     = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
-	orderedListRe = regexp.MustCompile(`^\d+\.\s+`)
-	boldRe        = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	italicRe      = regexp.MustCompile(`(?:^|[^*])\*([^*]+?)\*(?:[^*]|$)`)
-	codeRe        = regexp.MustCompile("`([^`]+)`")
-	strikeRe      = regexp.MustCompile(`~~(.+?)~~`)
-	underlineRe   = regexp.MustCompile(`<u>(.+?)</u>`)
-	linkRe        = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
-	mentionRe     = regexp.MustCompile(`\[@([^\]]+)\]\(accountid:([^)]+)\)`)
+	headingRe       = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
+	orderedListRe   = regexp.MustCompile(`^\d+\.\s+`)
+	boldRe          = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	italicRe        = regexp.MustCompile(`(?:^|[^*])\*([^*]+?)\*(?:[^*]|$)`)
+	codeRe          = regexp.MustCompile("`([^`]+)`")
+	strikeRe        = regexp.MustCompile(`~~(.+?)~~`)
+	underlineRe     = regexp.MustCompile(`<u>(.+?)</u>`)
+	linkRe          = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	mentionRe       = regexp.MustCompile(`\[@([^\]]+)\]\(accountid:([^)]+)\)`)
+	bulletMarkerRe  = regexp.MustCompile(`^(\s*)- (.*)$`)
+	orderedMarkerRe = regexp.MustCompile(`^(\s*)\d+\.\s+(.*)$`)
 )
 
 func parseInline(text string) []any {
@@ -607,10 +609,10 @@ func parseInlineSegment(text string) []any {
 
 func parseList(lines []string, idx *int, listType string) map[string]any {
 	adfType := "bulletList"
-	markerRe := regexp.MustCompile(`^(\s*)- (.*)$`)
+	markerRe := bulletMarkerRe
 	if listType == "ordered" {
 		adfType = "orderedList"
-		markerRe = regexp.MustCompile(`^(\s*)\d+\.\s+(.*)$`)
+		markerRe = orderedMarkerRe
 	}
 
 	var items []any

@@ -76,6 +76,7 @@ func (m *DebugModel) View() *lipgloss.Layer {
 }
 
 func (m *DebugModel) Update(msg tea.KeyPressMsg) tea.Cmd {
+	m.viewport.SetContent(formatLogs())
 	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
 	return cmd

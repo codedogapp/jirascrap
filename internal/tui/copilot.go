@@ -29,7 +29,7 @@ func (m *AppModel) handleSendToCopilot(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 	todos, err := m.store.GetTodos(ticket.ID)
 	if err != nil {
-		logger.Log.Warn("failed to load todos for copilot: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to load todos for copilot: %v", err))
 	}
 
 	return true, m.sendToCopilotCmd(ticket, todos)

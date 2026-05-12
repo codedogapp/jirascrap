@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -37,15 +38,27 @@ func NewSession(name string) (*Session, error) {
 
 // Ensure creates the session if it doesn't exist, starting in the given directory.
 func (s *Session) Ensure(dir string) error {
-	if s.Exists() {
+	exists, err := s.Exists()
+	if err != nil {
+		return fmt.Errorf("check session %q: %w", s.Name, err)
+	}
+	if exists {
 		return nil
 	}
 	return run("new-session", "-d", "-s", s.Name, "-c", dir)
 }
 
 // Exists checks whether the session is alive.
-func (s *Session) Exists() bool {
-	return run("has-session", "-t", s.Name) == nil
+func (s *Session) Exists() (bool, error) {
+	err := run("has-session", "-t", s.Name)
+	if err == nil {
+		return true, nil
+	}
+	// tmux returns exit code 1 when session doesn't exist — expected
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, err
 }
 
 // FindWindow returns the window ID for a window with the given name, or empty string if not found.

@@ -86,12 +86,12 @@ func (m *AppModel) fetchEpicChildrenCmd(epicKey string) tea.Cmd {
 
 func (m *AppModel) handleEpicChildrenLoaded(msg epicChildrenLoadedMsg) (tea.Model, tea.Cmd) {
 	if err := m.store.CacheEpicChildren(msg.epicKey, msg.tickets); err != nil {
-		logger.Log.Warn("failed to cache epic children: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to cache epic children: %v", err))
 	}
 	// Re-read from DB to get tags joined in
 	allChildren, err := m.store.GetAllCachedEpicChildren()
 	if err != nil {
-		logger.Log.Warn("failed to re-read epic children: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to re-read epic children: %v", err))
 		// Fall back to the data we have
 		m.epicChildren[msg.epicKey] = msg.tickets
 		m.list.StopSpinner()
@@ -164,6 +164,12 @@ func (m *AppModel) findTicket(id string) (model.Ticket, bool) {
 	}
 
 	return model.Ticket{}, false
+}
+
+// activeDetailModel returns the DetailModel if it's the currently active view.
+func (m *AppModel) activeDetailModel() (*views.DetailModel, bool) {
+	dm, ok := m.activeModel.(*views.DetailModel)
+	return dm, ok
 }
 
 func (m *AppModel) handleQuit(msg tea.KeyPressMsg) tea.Cmd {

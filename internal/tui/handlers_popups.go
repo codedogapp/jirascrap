@@ -56,7 +56,7 @@ func (m *AppModel) handleToggleTag(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 	allTags, err := m.store.GetUniqueTags()
 	if err != nil {
-		logger.Log.Warn("failed to load tags: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to load tags: %v", err))
 	}
 	m.tagModel.SetAllTags(allTags)
 
@@ -80,7 +80,7 @@ func (m *AppModel) handleToggleTodo(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 	todos, err := m.store.GetTodos(ticket.ID)
 	if err != nil {
-		logger.Log.Warn("failed to load todos: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to load todos: %v", err))
 	}
 	w, h := m.styles.App.GetFrameSize()
 	m.todoModel = views.NewTodoModel(m.width-w, m.height-h, ticket.ID, todos)
@@ -101,14 +101,14 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 	// Re-read tickets and epic children with fresh tags from DB
 	tickets, err := m.store.GetCachedTickets()
 	if err != nil {
-		logger.Log.Warn("failed to re-read tickets after tag save: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to re-read tickets after tag save: %v", err))
 	} else {
 		m.rootList().SetItems(tickets)
 	}
 
 	epicChildren, err := m.store.GetAllCachedEpicChildren()
 	if err != nil {
-		logger.Log.Warn("failed to re-read epic children after tag save: " + err.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to re-read epic children after tag save: %v", err))
 	} else {
 		m.epicChildren = epicChildren
 	}
@@ -125,11 +125,11 @@ func (m *AppModel) handleTagSaved(msg tagSavedMsg) (tea.Model, tea.Cmd) {
 
 	allTags, err2 := m.store.GetUniqueTags()
 	if err2 != nil {
-		logger.Log.Warn("failed to load tags after save: " + err2.Error())
+		logger.Log.Warn(fmt.Sprintf("failed to load tags after save: %v", err2))
 	}
 	m.tagModel.SetAllTags(allTags)
 
-	if dm, ok := m.activeModel.(*views.DetailModel); ok {
+	if dm, ok := m.activeDetailModel(); ok {
 		if ticket, ok := m.findTicket(msg.id); ok {
 			dm.UpdateTags(ticket)
 		}
@@ -241,7 +241,7 @@ func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory str
 			t.StatusCategory = newStatusCategory
 			tickets, err := m.store.GetCachedTickets()
 			if err != nil {
-				logger.Log.Warn("failed to re-read tickets for status update: " + err.Error())
+				logger.Log.Warn(fmt.Sprintf("failed to re-read tickets for status update: %v", err))
 			} else {
 				update(tickets)
 				root.SetItems(tickets)
@@ -264,7 +264,7 @@ func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory str
 	}
 
 	// Update detail view if showing this ticket
-	if dm, ok := m.activeModel.(*views.DetailModel); ok {
+	if dm, ok := m.activeDetailModel(); ok {
 		if dm.Ticket().ID == ticketID {
 			ticket := dm.Ticket()
 			ticket.Status = newStatus

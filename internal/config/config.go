@@ -18,7 +18,7 @@ type Config struct {
 }
 
 // String implements fmt.Stringer, masking the API token to prevent accidental logging.
-func (c Config) String() string {
+func (c *Config) String() string {
 	masked := "***"
 	if len(c.APIToken) > 4 {
 		masked = c.APIToken[:4] + "***"
@@ -41,13 +41,19 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.CopilotWorkspace == "" {
-		cwd, _ := os.Getwd()
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
 		cfg.CopilotWorkspace = cwd
 	}
 
 	// Expand ~ and resolve to absolute path for tmux compatibility
 	if strings.HasPrefix(cfg.CopilotWorkspace, "~/") {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
 		cfg.CopilotWorkspace = filepath.Join(home, cfg.CopilotWorkspace[2:])
 	}
 	if abs, err := filepath.Abs(cfg.CopilotWorkspace); err == nil {
@@ -79,5 +85,27 @@ func Load() (*Config, error) {
 		return nil, errors.New(b.String())
 	}
 
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	return cfg, nil
+}
+
+// Validate checks semantic correctness of configuration values.
+func (c *Config) Validate() error {
+	var errs []error
+
+	if !strings.HasPrefix(c.Domain, "https://") {
+		errs = append(errs, fmt.Errorf("JIRA_BASE_URL must use HTTPS (got %q)", c.Domain))
+	}
+
+	if strings.HasSuffix(c.Domain, "/") {
+		errs = append(errs, fmt.Errorf("JIRA_BASE_URL should not have trailing slash"))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
