@@ -13,6 +13,7 @@ type Config struct {
 	Email            string
 	APIToken         string
 	DBPath           string
+	LogDir           string
 	CopilotWorkspace string
 	CopilotModel     string
 }
@@ -32,12 +33,21 @@ func Load() (*Config, error) {
 		Email:            os.Getenv("JIRA_EMAIL"),
 		APIToken:         os.Getenv("JIRA_API_TOKEN"),
 		DBPath:           os.Getenv("JIRA_DB_PATH"),
+		LogDir:           os.Getenv("JIRASCRAP_LOG_DIR"),
 		CopilotWorkspace: os.Getenv("JIRASCRAP_COPILOT_WORKSPACE"),
 		CopilotModel:     os.Getenv("JIRASCRAP_COPILOT_MODEL"),
 	}
 
 	if cfg.DBPath == "" {
 		cfg.DBPath = "./data/jira.db"
+	}
+
+	if cfg.LogDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		cfg.LogDir = filepath.Join(home, ".local", "state", "jirascrap", "logs")
 	}
 
 	if cfg.CopilotWorkspace == "" {

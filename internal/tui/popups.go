@@ -14,7 +14,6 @@ type PopupManager struct {
 	tag    *views.TagModel
 	todo   *views.TodoModel
 	status *views.StatusModel
-	debug  *views.DebugModel
 	toast  *views.ToastModel
 
 	// Key handlers set by AppModel to avoid circular dependency.
@@ -27,14 +26,12 @@ func newPopupManager(
 	tag *views.TagModel,
 	todo *views.TodoModel,
 	status *views.StatusModel,
-	debug *views.DebugModel,
 	toast *views.ToastModel,
 ) *PopupManager {
 	return &PopupManager{
 		tag:    tag,
 		todo:   todo,
 		status: status,
-		debug:  debug,
 		toast:  toast,
 	}
 }
@@ -94,9 +91,6 @@ func (p *PopupManager) Layers() []*lipgloss.Layer {
 	if l := p.status.View(); l != nil {
 		layers = append(layers, l)
 	}
-	if l := p.debug.View(); l != nil {
-		layers = append(layers, l)
-	}
 	if l := p.toast.View(); l != nil {
 		layers = append(layers, l)
 	}
@@ -109,6 +103,5 @@ func (p *PopupManager) SetSize(contentWidth, contentHeight, termWidth, termHeigh
 	p.tag.SetSize(contentWidth, contentHeight)
 	p.todo.SetSize(contentWidth, contentHeight)
 	p.status.SetSize(contentWidth, contentHeight)
-	p.debug.SetSize(termWidth, termHeight)
 	p.toast.SetSize(termWidth, termHeight)
 }

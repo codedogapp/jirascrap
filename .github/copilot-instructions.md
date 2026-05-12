@@ -5,7 +5,7 @@
 ## Architecture
 
 ```
-main.go → config.Load() → jira.NewClient() → store.Open() → tui.Run()
+main.go → config.Load() → jira.NewClient() → logger.OpenSessionLog() → store.Open() → tui.Run()
 
 ┌───────────────────────────────────────────────┐
 │  TUI (AppModel)                               │
@@ -15,18 +15,21 @@ main.go → config.Load() → jira.NewClient() → store.Open() → tui.Run()
 │  │  DetailModel — ticket detail + markdown │  │
 │  │  TagModel    — tag popup overlay        │  │
 │  │  TodoModel   — todo popup overlay       │  │
-│  │  DebugModel  — log overlay              │  │
+│  │  StatusModel — status transition popup  │  │
 │  │  ToastModel  — temporary notifications  │  │
 │  └─────────────────────────────────────────┘  │
+│  PopupManager: visibility, key routing,       │
+│    overlay rendering                          │
 │  Handlers: key routing, async commands        │
 │  Messages: typed results for async operations │
 └───────────────────────────────────────────────┘
         │                          │
         ▼                          ▼
   ┌───────────┐           ┌──────────────────┐
-  │ Jira API  │           │ SQLite MetaStore  │
-  │ (Client)  │           │ (tags, todos,     │
-  │           │           │  ticket cache)    │
+  │ Jira API  │           │ SQLite Stores    │
+  │ (Client)  │           │  TagStore        │
+  │ + HTTP    │           │  TodoStore       │
+  │  transport│           │  TicketCache     │
   └───────────┘           └──────────────────┘
 ```
 
@@ -34,14 +37,14 @@ main.go → config.Load() → jira.NewClient() → store.Open() → tui.Run()
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| `config` | `internal/config/` | Env-var loader: Domain, Email, APIToken, DBPath, CopilotWorkspace, CopilotModel |
-| `jira` | `internal/jira/` | HTTP client for Jira REST API v3. Fetches tickets, epic children. ADF↔Markdown converter |
+| `config` | `internal/config/` | Env-var loader: Domain, Email, APIToken, DBPath, LogDir, CopilotWorkspace, CopilotModel |
+| `jira` | `internal/jira/` | HTTP client for Jira REST API v3. Fetches tickets, epic children. ADF↔Markdown converter. `client.go` (API ops) + `http.go` (transport/retry) |
 | `model` | `internal/model/` | Domain types: `Ticket`, `Todo` |
-| `store` | `internal/store/` | SQLite persistence via `MetaStore` interface. Goose migrations. Caches tickets, tags, todos |
-| `logger` | `internal/logger/` | Thread-safe log buffer (max 100 entries). Global `Log` singleton. GooseLoggerAdapter |
+| `store` | `internal/store/` | SQLite persistence via 3 narrow interfaces. Goose migrations. Split into `TagStore`, `TodoStore`, `TicketCache` |
+| `logger` | `internal/logger/` | Thread-safe log buffer (max 100 entries) + file-based session logging. Global `Log` singleton. GooseLoggerAdapter |
 | `tmux` | `internal/tmux/` | Wrapper around `tmux` CLI for Copilot integration |
-| `tui` | `internal/tui/` | Bubble Tea app: AppModel, handlers, messages, copilot launcher |
-| `views` | `internal/tui/views/` | Sub-models: ListModel, DetailModel, TagModel, TodoModel, StatusModel, DebugModel, ToastModel |
+| `tui` | `internal/tui/` | Bubble Tea app: AppModel, PopupManager, handlers, messages, copilot launcher |
+| `views` | `internal/tui/views/` | Sub-models: ListModel, DetailModel, TagModel, TodoModel, StatusModel, ToastModel |
 | `keymaps` | `internal/tui/keymaps/` | Central key binding registry (DefaultKeyMap) |
 
 ## Key Types
@@ -62,11 +65,10 @@ type Ticket struct {
 type Todo struct { Title string; Done bool }
 ```
 
-### `store.MetaStore` (interface)
-- `SaveMeta(id, tags)` / `GetUniqueTags()`
-- `GetTodos(ticketID)` / `SaveTodos(ticketID, todos)`
-- `CacheTickets(tickets)` / `GetCachedTickets()`
-- `CacheEpicChildren(epicKey, tickets)` / `GetAllCachedEpicChildren()`
+### `store` interfaces
+- **`TagStore`**: `SaveMeta(id, tags)` / `GetUniqueTags()`
+- **`TodoStore`**: `GetTodos(ticketID)` / `SaveTodos(ticketID, todos)`
+- **`TicketCache`**: `CacheTickets(tickets)` / `GetCachedTickets()` / `CacheEpicChildren(epicKey, tickets)` / `GetAllCachedEpicChildren()`
 
 ### `jira.Client`
 - `FetchTickets()` — JQL: `assignee = currentUser() AND statusCategory != Done`
@@ -78,7 +80,7 @@ type Todo struct { Title string; Done bool }
 
 ## Data Flow
 
-1. **Startup**: Load config → create client → open DB (run migrations) → `tui.Run()`
+1. **Startup**: Load config → create client → open session log → open DB (run migrations) → `tui.Run()`
 2. **Init**: Spinner + load cached tickets from DB + background sync from Jira API
 3. **Sync**: Fetch tickets → cache in SQLite → re-read with tags joined → update UI
 4. **Tags**: `t` key → TagModel popup → `SaveMeta()` → reload all views
@@ -95,7 +97,7 @@ type Todo struct { Title string; Done bool }
 
 ## UI Patterns
 
-- **Overlay composition**: Base view + layers (tag/todo/debug/toast) via `lipgloss.NewCompositor`
+- **Overlay composition**: Base view + layers (tag/todo/status/toast) via `lipgloss.NewCompositor`
 - **Message passing**: Async commands return typed messages, no blocking
 - **Popup routing**: `isPopupActive()` guards global keys; popups get keys first
 - **Epic navigation**: `previousList` stores parent list; `restoreRootList()` pops back
@@ -109,10 +111,9 @@ type Todo struct { Title string; Done bool }
 | `enter` | Select | `t` | Tag |
 | `esc` | Back | `n` | Todo |
 | `h` | Home | `s` | Status transition |
-| `d` | Debug | `r` | Refresh |
 | `c` | Copilot | `o` | Browser |
-| `?` | Help | `q` | Quit |
-| `/` | Filter | | |
+| `r` | Refresh | `?` | Help |
+| `/` | Filter | `q` | Quit |
 
 ## Build & Test
 

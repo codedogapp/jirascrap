@@ -9,6 +9,7 @@ import (
 
 	"github.com/codedogapp/jirascrap/internal/config"
 	"github.com/codedogapp/jirascrap/internal/jira"
+	"github.com/codedogapp/jirascrap/internal/logger"
 	"github.com/codedogapp/jirascrap/internal/store"
 	"github.com/codedogapp/jirascrap/internal/tui"
 )
@@ -21,6 +22,18 @@ func main() {
 	}
 
 	apiClient := jira.NewClient(cfg)
+
+	// Set up file logging
+	logFile, logPath, err := logger.OpenSessionLog(cfg.LogDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: file logging disabled: %v\n", err)
+	} else {
+		if l, ok := logger.Log.(*logger.Logger); ok {
+			l.SetOutput(logFile)
+			defer l.Close()
+		}
+		logger.Log.Info("session started, log file: " + logPath)
+	}
 
 	sqliteDB, err := store.Open(cfg.DBPath)
 	if err != nil {

@@ -395,27 +395,6 @@ func TestIntegration_RefreshTriggerSync(t *testing.T) {
 	}
 }
 
-func TestIntegration_DebugOverlay(t *testing.T) {
-	client := &mockClient{tickets: testTickets, epicChildren: testEpicChildren}
-	app := newTestApp(client)
-	sendSize(t, app, 120, 40)
-	runInit(t, app)
-
-	// Toggle debug
-	sendKey(t, app, "d")
-
-	if !app.popups.debug.IsVisible() {
-		t.Error("debug overlay should be visible after 'd'")
-	}
-
-	// Toggle off
-	sendKey(t, app, "d")
-
-	if app.popups.debug.IsVisible() {
-		t.Error("debug overlay should hide after second 'd'")
-	}
-}
-
 func TestIntegration_QuitKey(t *testing.T) {
 	client := &mockClient{tickets: testTickets, epicChildren: testEpicChildren}
 	app := newTestApp(client)

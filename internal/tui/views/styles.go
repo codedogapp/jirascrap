@@ -36,10 +36,15 @@ var (
 	red          = lipgloss.Color("#EF4444")
 
 	// Z-index layers for popup overlays.
-
-	ZPopup  = 1  // standard popups (tag, todo, debug)
+	ZPopup  = 1  // standard popups (tag, todo)
 	ZStatus = 2  // status popup (above other popups)
 	ZToast  = 10 // toast notifications (topmost)
+
+	// Popup sizing ratios
+	RatioWidth      = 2
+	RatioHeight     = 3
+	PopupWidthScale = 0.7 // fraction of content width for popup overlays
+	todoHeightRatio = 2
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).

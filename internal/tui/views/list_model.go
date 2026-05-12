@@ -58,7 +58,6 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 			keymaps.DefaultKeyMap.ToggleStatus,
 			keymaps.DefaultKeyMap.OpenInBrowser,
 			keymaps.DefaultKeyMap.SendToCopilot,
-			keymaps.DefaultKeyMap.ToggleDebug,
 			keymaps.DefaultKeyMap.Select,
 			keymaps.DefaultKeyMap.Refresh,
 		}

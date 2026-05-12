@@ -16,7 +16,6 @@ type KeyMap struct {
 	ToggleTagging  key.Binding
 	ToggleTodo     key.Binding
 	ToggleStatus   key.Binding
-	ToggleDebug    key.Binding
 	Refresh        key.Binding
 	ToggleHelp     key.Binding
 	OpenInBrowser  key.Binding
@@ -47,7 +46,6 @@ func detectConflicts(km *KeyMap) []string {
 		{"ToggleTagging", km.ToggleTagging},
 		{"ToggleTodo", km.ToggleTodo},
 		{"ToggleStatus", km.ToggleStatus},
-		{"ToggleDebug", km.ToggleDebug},
 		{"Refresh", km.Refresh},
 		{"ToggleHelp", km.ToggleHelp},
 		{"OpenInBrowser", km.OpenInBrowser},
@@ -110,11 +108,6 @@ func newKeyMap() *KeyMap {
 			key.WithHelp("s", "status"),
 		),
 
-		ToggleDebug: key.NewBinding(
-			key.WithKeys("d"),
-			key.WithHelp("d", "debug"),
-		),
-
 		ToggleHelp: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "more"),
@@ -158,7 +151,7 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
 		{k.ToggleTagging, k.ToggleTodo, k.ToggleStatus, k.OpenInBrowser, k.SendToCopilot},
-		{k.GoBack, k.GoHome, k.Quit, k.ToggleDebug, k.Refresh},
+		{k.GoBack, k.GoHome, k.Quit, k.Refresh},
 	}
 }
 

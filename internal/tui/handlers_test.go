@@ -76,7 +76,6 @@ func newHandlerTestApp(tickets []model.Ticket) *AppModel {
 	todoModel := views.NewTodoModel(80, 30, "", nil)
 	statusModel := views.NewStatusModel(80, 30)
 	toastModel := views.NewToastModel(120, 40)
-	debugModel := views.NewDebugModel(120, 40)
 	ms := &mockStore{tickets: tickets}
 	return &AppModel{
 		tagStore:     ms,
@@ -84,7 +83,7 @@ func newHandlerTestApp(tickets []model.Ticket) *AppModel {
 		ticketCache:  ms,
 		list:         list,
 		activeModel:  list,
-		popups:       newPopupManager(tagModel, todoModel, statusModel, debugModel, toastModel),
+		popups:       newPopupManager(tagModel, todoModel, statusModel, toastModel),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 		width:        120,

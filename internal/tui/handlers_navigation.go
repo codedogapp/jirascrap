@@ -208,30 +208,6 @@ func (m *AppModel) handleQuit(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-func (m *AppModel) handleDebug(msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if key.Matches(msg, keymaps.DefaultKeyMap.ToggleDebug) && !m.isPopupActive() {
-		if m.popups.debug.IsVisible() {
-			m.popups.debug.Hide()
-		} else {
-			m.popups.debug.Show()
-		}
-		return true, nil
-	}
-
-	isVisible := m.popups.debug.IsVisible()
-
-	if key.Matches(msg, keymaps.DefaultKeyMap.GoBack) && isVisible {
-		m.popups.debug.Hide()
-		return true, nil
-	}
-
-	if isVisible {
-		return true, m.popups.debug.Update(msg)
-	}
-
-	return false, nil
-}
-
 func (m *AppModel) isPopupActive() bool {
 	return m.popups.IsActive()
 }

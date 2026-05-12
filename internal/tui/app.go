@@ -54,7 +54,6 @@ func NewApp(
 ) *AppModel {
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
-	debugModel := views.NewDebugModel(0, 0)
 	tagModel := views.NewTagModel(0, 0, nil)
 	todoModel := views.NewTodoModel(0, 0, "", nil)
 	statusModel := views.NewStatusModel(0, 0)
@@ -69,7 +68,7 @@ func NewApp(
 		list:         listModel,
 		navLevel:     navRoot,
 		activeModel:  listModel,
-		popups:       newPopupManager(tagModel, todoModel, statusModel, debugModel, toastModel),
+		popups:       newPopupManager(tagModel, todoModel, statusModel, toastModel),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 	}
@@ -165,9 +164,6 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if cmd := m.handleQuit(msg); cmd != nil {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleDebug(msg); consumed {
 		return m, cmd
 	}
 	if consumed, cmd := m.popups.RouteKeyPress(msg); consumed {
