@@ -61,7 +61,10 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 		}
 
 		// Skip if copilot already running
-		if strings.Contains(copilotSession.WindowCommand(windowID), "copilot") {
+		cmd, err := copilotSession.WindowCommand(windowID)
+		if err != nil {
+			logger.Log.Warn(fmt.Sprintf("failed to check window command: %v", err))
+		} else if strings.Contains(cmd, "copilot") {
 			return copilotLaunchedMsg{ticketID: ticket.ID}
 		}
 
@@ -71,11 +74,11 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("cd to workspace: %w", err)}
 		}
 
-		cmd := fmt.Sprintf(
+		copilotCmd := fmt.Sprintf(
 			"copilot --plan --model %s --allow-all-paths -i \"$(cat '%s')\"",
 			copilotModel, promptPath,
 		)
-		if err := copilotSession.SendKeys(windowID, cmd); err != nil {
+		if err := copilotSession.SendKeys(windowID, copilotCmd); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("launching copilot: %w", err)}
 		}
 
@@ -84,16 +87,18 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 }
 
 func resolveWindow(ticketID, workspace string) (string, error) {
-	if id, ok := copilotSession.FindWindow(ticketID); ok {
+	if id, ok, err := copilotSession.FindWindow(ticketID); err != nil {
+		return "", fmt.Errorf("find window %q: %w", ticketID, err)
+	} else if ok {
 		return id, nil
 	}
 
 	// Claim first unused window if session was just created
-	if id, name, ok := copilotSession.FirstWindow(); ok {
-		if !strings.Contains(name, "-") {
-			_ = copilotSession.RenameWindow(id, ticketID)
-			return id, nil
-		}
+	if id, name, ok, err := copilotSession.FirstWindow(); err != nil {
+		return "", fmt.Errorf("first window: %w", err)
+	} else if ok && !strings.Contains(name, "-") {
+		_ = copilotSession.RenameWindow(id, ticketID)
+		return id, nil
 	}
 
 	return copilotSession.NewWindow(ticketID, workspace)

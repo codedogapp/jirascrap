@@ -61,41 +61,41 @@ func (s *Session) Exists() (bool, error) {
 	return false, err
 }
 
-// FindWindow returns the window ID for a window with the given name, or empty string if not found.
-func (s *Session) FindWindow(name string) (string, bool) {
+// FindWindow returns the window ID for a window with the given name.
+func (s *Session) FindWindow(name string) (string, bool, error) {
 	out, err := output("list-windows", "-t", s.Name, "-F", "#{window_id}\t#{window_name}")
 	if err != nil {
-		return "", false
+		return "", false, fmt.Errorf("list-windows: %w", err)
 	}
 
 	for _, line := range lines(out) {
 		parts := strings.SplitN(line, "\t", 2)
 		if len(parts) == 2 && parts[1] == name {
-			return parts[0], true
+			return parts[0], true, nil
 		}
 	}
 
-	return "", false
+	return "", false, nil
 }
 
 // FirstWindow returns the ID and name of the first (and only) window, if there's exactly one.
-func (s *Session) FirstWindow() (id string, name string, ok bool) {
+func (s *Session) FirstWindow() (id string, name string, ok bool, err error) {
 	out, err := output("list-windows", "-t", s.Name, "-F", "#{window_id}\t#{window_name}")
 	if err != nil {
-		return "", "", false
+		return "", "", false, fmt.Errorf("list-windows: %w", err)
 	}
 
 	l := lines(out)
 	if len(l) != 1 {
-		return "", "", false
+		return "", "", false, nil
 	}
 
 	parts := strings.SplitN(l[0], "\t", 2)
 	if len(parts) != 2 {
-		return "", "", false
+		return "", "", false, nil
 	}
 
-	return parts[0], parts[1], true
+	return parts[0], parts[1], true, nil
 }
 
 // RenameWindow renames the window with the given ID.
@@ -133,12 +133,12 @@ func (s *Session) SendKeys(target, cmd string) error {
 }
 
 // WindowCommand returns the current command running in the given window's active pane.
-func (s *Session) WindowCommand(windowID string) string {
+func (s *Session) WindowCommand(windowID string) (string, error) {
 	out, err := output("list-panes", "-t", windowID, "-F", "#{pane_current_command}")
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("list-panes: %w", err)
 	}
-	return strings.TrimSpace(out)
+	return strings.TrimSpace(out), nil
 }
 
 func run(args ...string) error {

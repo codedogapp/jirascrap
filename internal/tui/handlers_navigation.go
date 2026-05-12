@@ -17,7 +17,7 @@ import (
 func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.list.SetSize(msg.Width, msg.Height)
 
-	if m.previousList != nil {
+	if m.navLevel == navEpic {
 		m.previousList.SetSize(msg.Width, msg.Height)
 	}
 
@@ -40,7 +40,7 @@ func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 
 // rootList returns the main ticket list, even when navigated into an epic.
 func (m *AppModel) rootList() *views.ListModel {
-	if m.previousList != nil {
+	if m.navLevel == navEpic {
 		return m.previousList
 	}
 	return m.list
@@ -70,6 +70,7 @@ func (m *AppModel) showEpicChildren(epicKey string, tickets []model.Ticket) (tea
 
 	m.previousList = m.list
 	m.list = epicList
+	m.navLevel = navEpic
 	m.activeModel = epicList
 	return m, nil
 }
@@ -110,7 +111,7 @@ func (m *AppModel) handleExitEpic(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	if m.previousList == nil {
+	if m.navLevel != navEpic {
 		return false, nil
 	}
 
@@ -145,9 +146,10 @@ func (m *AppModel) handleGoHome(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 
 // restoreRootList navigates back to the main ticket list, discarding epic navigation.
 func (m *AppModel) restoreRootList() {
-	if m.previousList != nil {
+	if m.navLevel == navEpic {
 		m.list = m.previousList
 		m.previousList = nil
+		m.navLevel = navRoot
 	}
 	m.activeModel = m.list
 }
@@ -195,7 +197,7 @@ func (m *AppModel) refreshListsFromDB() {
 
 // refreshCurrentEpicView updates the current epic list view if user is inside one.
 func (m *AppModel) refreshCurrentEpicView() {
-	if m.previousList == nil {
+	if m.navLevel != navEpic {
 		return
 	}
 	for epicKey, children := range m.epicChildren {

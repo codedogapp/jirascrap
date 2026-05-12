@@ -314,8 +314,13 @@ func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticke
 	sem := make(chan struct{}, c.maxConcurrent)
 	ch := make(chan result, len(epics))
 
+	launched := 0
 	for _, t := range epics {
+		if ctx.Err() != nil {
+			break
+		}
 		sem <- struct{}{}
+		launched++
 		go func(epicKey string) {
 			defer func() {
 				<-sem
@@ -330,13 +335,17 @@ func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticke
 
 	out := make(map[string][]model.Ticket, len(epics))
 	var errs []error
-	for range epics {
+	for range launched {
 		r := <-ch
 		if r.err != nil {
 			errs = append(errs, fmt.Errorf("epic %s: %w", r.epicKey, r.err))
 			continue
 		}
 		out[r.epicKey] = r.children
+	}
+
+	if ctx.Err() != nil {
+		errs = append(errs, ctx.Err())
 	}
 
 	return out, errors.Join(errs...)

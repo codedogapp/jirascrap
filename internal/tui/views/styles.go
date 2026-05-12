@@ -37,8 +37,9 @@ var (
 
 	// Z-index layers for popup overlays.
 
-	ZPopup  = 1 // standard popups (tag, todo, debug)
-	ZStatus = 2 // status popup (above other popups)
+	ZPopup  = 1  // standard popups (tag, todo, debug)
+	ZStatus = 2  // status popup (above other popups)
+	ZToast  = 10 // toast notifications (topmost)
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).

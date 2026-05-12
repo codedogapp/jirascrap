@@ -22,9 +22,11 @@ func NewToastModel(width, height int) *ToastModel {
 	}
 }
 
+const toastTimeout = 3 * time.Second
+
 func (m *ToastModel) Show(msg string) tea.Cmd {
 	m.message = msg
-	return tea.Tick(3*time.Second, func(time.Time) tea.Msg {
+	return tea.Tick(toastTimeout, func(time.Time) tea.Msg {
 		return ToastTimeoutMsg{}
 	})
 }
@@ -55,5 +57,5 @@ func (m *ToastModel) View() *lipgloss.Layer {
 	return lipgloss.NewLayer(content).
 		X(m.terminalWidth - lipgloss.Width(content) - w).
 		Y(2).
-		Z(10)
+		Z(ZToast)
 }

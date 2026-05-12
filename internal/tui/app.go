@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,6 +13,14 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+// navLevel tracks whether user is at root ticket list or inside an epic.
+type navLevel int
+
+const (
+	navRoot navLevel = iota
+	navEpic
+)
+
 type AppModel struct {
 	// Dependencies
 	jiraClient jira.TicketClient
@@ -21,6 +30,7 @@ type AppModel struct {
 	// State
 	list         *views.ListModel
 	previousList *views.ListModel
+	navLevel     navLevel
 	activeModel  views.ActiveModel
 	debugModel   *views.DebugModel
 	tagModel     *views.TagModel
@@ -46,6 +56,7 @@ func NewApp(client jira.TicketClient, s store.MetaStore, cfg *config.Config) *Ap
 		store:        s,
 		config:       cfg,
 		list:         listModel,
+		navLevel:     navRoot,
 		activeModel:  listModel,
 		debugModel:   debugModel,
 		tagModel:     views.NewTagModel(0, 0, nil),
@@ -230,9 +241,16 @@ func (m *AppModel) View() tea.View {
 	return v
 }
 
-func Run(client jira.TicketClient, s store.MetaStore, cfg *config.Config) error {
+func Run(ctx context.Context, client jira.TicketClient, s store.MetaStore, cfg *config.Config) error {
 	app := NewApp(client, s, cfg)
 	p := tea.NewProgram(app)
+
+	// Quit TUI gracefully when context is cancelled (e.g. SIGINT/SIGTERM).
+	go func() {
+		<-ctx.Done()
+		p.Quit()
+	}()
+
 	_, err := p.Run()
 	if err != nil {
 		return fmt.Errorf("running TUI: %w", err)

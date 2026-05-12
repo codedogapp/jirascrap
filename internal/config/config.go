@@ -64,25 +64,19 @@ func Load() (*Config, error) {
 		cfg.CopilotModel = "claude-haiku-4.5"
 	}
 
-	var errs []string
+	var errs []error
 	if cfg.Domain == "" {
-		errs = append(errs, "JIRA_BASE_URL is required")
+		errs = append(errs, fmt.Errorf("JIRA_BASE_URL is required"))
 	}
 	if cfg.Email == "" {
-		errs = append(errs, "JIRA_EMAIL is required")
+		errs = append(errs, fmt.Errorf("JIRA_EMAIL is required"))
 	}
 	if cfg.APIToken == "" {
-		errs = append(errs, "JIRA_API_TOKEN is required")
+		errs = append(errs, fmt.Errorf("JIRA_API_TOKEN is required"))
 	}
 
 	if len(errs) > 0 {
-		var b strings.Builder
-		b.WriteString("Missing configuration: \n")
-		for _, e := range errs {
-			fmt.Fprintf(&b, "- %s\n", e)
-		}
-		b.WriteString("\nSet these in your shell environment.")
-		return nil, errors.New(b.String())
+		return nil, fmt.Errorf("missing configuration:\n%w\n\nSet these in your shell environment.", errors.Join(errs...))
 	}
 
 	if err := cfg.Validate(); err != nil {

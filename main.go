@@ -29,18 +29,12 @@ func main() {
 	}
 	defer sqliteDB.Close()
 
-	// Ensure DB is closed on unexpected signals
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	go func() {
-		<-ctx.Done()
-		sqliteDB.Close()
-	}()
-
 	metaStore := store.NewSqliteMetaStore(sqliteDB.DB)
 
-	err = tui.Run(apiClient, metaStore, cfg)
+	err = tui.Run(ctx, apiClient, metaStore, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		os.Exit(1)

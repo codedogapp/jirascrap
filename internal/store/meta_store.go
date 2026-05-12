@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codedogapp/jirascrap/internal/logger"
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
@@ -339,8 +338,15 @@ func (s *SqliteMetaStore) GetAllCachedEpicChildren() (map[string][]model.Ticket,
 			return nil, fmt.Errorf("get epic children: scan: %w", err)
 		}
 		t.EpicID = &epicID
-		t.CreatedAt = parseTime(createdAt)
-		t.UpdatedAt = parseTime(updatedAt)
+		var err2 error
+		t.CreatedAt, err2 = parseTime(createdAt)
+		if err2 != nil {
+			return nil, fmt.Errorf("get epic children: %w", err2)
+		}
+		t.UpdatedAt, err2 = parseTime(updatedAt)
+		if err2 != nil {
+			return nil, fmt.Errorf("get epic children: %w", err2)
+		}
 		if tags.Valid && tags.String != "" {
 			t.Tags = strings.Split(tags.String, ",")
 		}
@@ -378,8 +384,15 @@ func scanTicketWithTags(row rowScanner) (model.Ticket, error) {
 	); err != nil {
 		return model.Ticket{}, err
 	}
-	t.CreatedAt = parseTime(createdAt)
-	t.UpdatedAt = parseTime(updatedAt)
+	var err2 error
+	t.CreatedAt, err2 = parseTime(createdAt)
+	if err2 != nil {
+		return model.Ticket{}, fmt.Errorf("scan ticket: %w", err2)
+	}
+	t.UpdatedAt, err2 = parseTime(updatedAt)
+	if err2 != nil {
+		return model.Ticket{}, fmt.Errorf("scan ticket: %w", err2)
+	}
 	if tags.Valid && tags.String != "" {
 		t.Tags = strings.Split(tags.String, ",")
 	}
@@ -405,12 +418,11 @@ func ticketInsertValues(t model.Ticket) []any {
 	}
 }
 
-// parseTime parses an RFC3339 timestamp, logging a warning on failure.
-func parseTime(s string) time.Time {
+// parseTime parses an RFC3339 timestamp, returning an error on failure.
+func parseTime(s string) (time.Time, error) {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
-		logger.Log.Warn(fmt.Sprintf("failed to parse time %q: %v", s, err))
-		return time.Time{}
+		return time.Time{}, fmt.Errorf("parse time %q: %w", s, err)
 	}
-	return t
+	return t, nil
 }

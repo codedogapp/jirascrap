@@ -4,6 +4,16 @@ import (
 	"sync"
 )
 
+// Interface defines the logging contract. Consumers should depend on this
+// rather than the concrete Logger type to enable testing and DI.
+type Interface interface {
+	Info(msg string)
+	Warn(msg string)
+	Error(msg string)
+	Debug(msg string)
+	Logs() []LogEntry
+}
+
 type Logger struct {
 	mu       sync.Mutex
 	logs     []LogEntry
@@ -26,7 +36,8 @@ const (
 
 const maxLogs = 100
 
-var Log = &Logger{minLevel: DEBUG}
+// Log is the default global logger instance. Prefer injecting Interface where possible.
+var Log Interface = &Logger{minLevel: DEBUG}
 
 func (l Level) String() string {
 	switch l {

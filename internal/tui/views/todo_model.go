@@ -37,8 +37,6 @@ type TodoModel struct {
 	contentHeight int
 }
 
-const todoHeightRatio = 2
-
 func NewTodoModel(contentWidth, contentHeight int, ticketID string, todos []model.Todo) *TodoModel {
 	w := contentWidth / RatioWidth
 	h := contentHeight / todoHeightRatio
@@ -202,7 +200,7 @@ func (m *TodoModel) View() *lipgloss.Layer {
 	}
 	content += "\n" + m.help.View(keymaps.DefaultTodoKeyMap)
 
-	actualWidth := int(float64(m.contentWidth) * 0.7)
+	actualWidth := int(float64(m.contentWidth) * PopupWidthScale)
 
 	return RenderPopupLayer(
 		content,
