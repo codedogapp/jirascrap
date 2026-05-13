@@ -14,9 +14,10 @@ import (
 )
 
 type ListModel struct {
-	list    list.Model
-	tickets []model.Ticket
-	style   lipgloss.Style
+	list      list.Model
+	tickets   []model.Ticket
+	ticketIdx map[string]int
+	style     lipgloss.Style
 }
 
 type TicketItem struct {
@@ -57,7 +58,6 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 			keymaps.DefaultKeyMap.ToggleStatus,
 			keymaps.DefaultKeyMap.OpenInBrowser,
 			keymaps.DefaultKeyMap.SendToCopilot,
-			keymaps.DefaultKeyMap.ToggleDebug,
 			keymaps.DefaultKeyMap.Select,
 			keymaps.DefaultKeyMap.Refresh,
 		}
@@ -117,10 +117,8 @@ func (m *ListModel) View() tea.View {
 }
 
 func (m *ListModel) FindTicket(id string) (model.Ticket, bool) {
-	for _, t := range m.tickets {
-		if t.ID == id {
-			return t, true
-		}
+	if idx, ok := m.ticketIdx[id]; ok && idx < len(m.tickets) {
+		return m.tickets[idx], true
 	}
 	return model.Ticket{}, false
 }
@@ -141,7 +139,16 @@ func getItemsList(tickets []model.Ticket) []list.Item {
 func (m *ListModel) SetItems(tickets []model.Ticket) {
 	items := getItemsList(tickets)
 	m.tickets = tickets
+	m.ticketIdx = buildTicketIndex(tickets)
 	m.list.SetItems(items)
+}
+
+func buildTicketIndex(tickets []model.Ticket) map[string]int {
+	idx := make(map[string]int, len(tickets))
+	for i, t := range tickets {
+		idx[t.ID] = i
+	}
+	return idx
 }
 
 func (m *ListModel) Initialize(tickets []model.Ticket) {

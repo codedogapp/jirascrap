@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type response struct {
@@ -57,61 +58,71 @@ var data = response{
 		{
 			Key: "PROJ-101",
 			Fields: fields{
-				Summary:     "Fix authentication timeout",
-				Description: adfDoc("Users are getting logged out after 5 minutes. We need to extend the session TTL and add a refresh token flow."),
-				Reporter:    named{DisplayName: "Alice Chen"},
-				Status:      status{Name: "In Progress", StatusCategory: named{Name: "In Progress"}},
-				Priority:    named{Name: "High"},
-				Created:     "2024-11-01T09:00:00.000+0000",
-				Updated:     "2024-11-15T14:30:00.000+0000",
+				Summary: "Fix authentication timeout",
+				Description: adfDoc(
+					"Users are getting logged out after 5 minutes. We need to extend the session TTL and add a refresh token flow.",
+				),
+				Reporter: named{DisplayName: "Alice Chen"},
+				Status:   status{Name: "In Progress", StatusCategory: named{Name: "In Progress"}},
+				Priority: named{Name: "High"},
+				Created:  "2024-11-01T09:00:00.000+0000",
+				Updated:  "2024-11-15T14:30:00.000+0000",
 			},
 		},
 		{
 			Key: "PROJ-102",
 			Fields: fields{
-				Summary:     "Add dark mode support",
-				Description: adfDoc("Implement a dark color scheme that respects the user's OS preference. Should also have a manual toggle in settings."),
-				Reporter:    named{DisplayName: "Bob Martinez"},
-				Status:      status{Name: "To Do", StatusCategory: named{Name: "To Do"}},
-				Priority:    named{Name: "Medium"},
-				Created:     "2024-11-05T11:00:00.000+0000",
-				Updated:     "2024-11-10T08:15:00.000+0000",
+				Summary: "Add dark mode support",
+				Description: adfDoc(
+					"Implement a dark color scheme that respects the user's OS preference. Should also have a manual toggle in settings.",
+				),
+				Reporter: named{DisplayName: "Bob Martinez"},
+				Status:   status{Name: "To Do", StatusCategory: named{Name: "To Do"}},
+				Priority: named{Name: "Medium"},
+				Created:  "2024-11-05T11:00:00.000+0000",
+				Updated:  "2024-11-10T08:15:00.000+0000",
 			},
 		},
 		{
 			Key: "PROJ-103",
 			Fields: fields{
-				Summary:     "Database migration fails on PostgreSQL 16",
-				Description: adfDoc("The goose migration 005 uses a deprecated syntax that PG16 no longer accepts. Need to rewrite the ALTER TABLE statement."),
-				Reporter:    named{DisplayName: "Carol Wu"},
-				Status:      status{Name: "Done", StatusCategory: named{Name: "Done"}},
-				Priority:    named{Name: "Highest"},
-				Created:     "2024-10-20T16:45:00.000+0000",
-				Updated:     "2024-11-12T10:00:00.000+0000",
+				Summary: "Database migration fails on PostgreSQL 16",
+				Description: adfDoc(
+					"The goose migration 005 uses a deprecated syntax that PG16 no longer accepts. Need to rewrite the ALTER TABLE statement.",
+				),
+				Reporter: named{DisplayName: "Carol Wu"},
+				Status:   status{Name: "Done", StatusCategory: named{Name: "Done"}},
+				Priority: named{Name: "Highest"},
+				Created:  "2024-10-20T16:45:00.000+0000",
+				Updated:  "2024-11-12T10:00:00.000+0000",
 			},
 		},
 		{
 			Key: "PROJ-104",
 			Fields: fields{
-				Summary:     "Optimize search indexing",
-				Description: adfDoc("Full-text search is slow on large datasets. Consider switching to trigram indexes or adding ElasticSearch."),
-				Reporter:    named{DisplayName: "Dave Kim"},
-				Status:      status{Name: "In Review", StatusCategory: named{Name: "In Progress"}},
-				Priority:    named{Name: "Low"},
-				Created:     "2024-11-08T13:20:00.000+0000",
-				Updated:     "2024-11-14T17:00:00.000+0000",
+				Summary: "Optimize search indexing",
+				Description: adfDoc(
+					"Full-text search is slow on large datasets. Consider switching to trigram indexes or adding ElasticSearch.",
+				),
+				Reporter: named{DisplayName: "Dave Kim"},
+				Status:   status{Name: "In Review", StatusCategory: named{Name: "In Progress"}},
+				Priority: named{Name: "Low"},
+				Created:  "2024-11-08T13:20:00.000+0000",
+				Updated:  "2024-11-14T17:00:00.000+0000",
 			},
 		},
 		{
 			Key: "PROJ-105",
 			Fields: fields{
-				Summary:     "Update API documentation",
-				Description: adfDoc("The REST API docs are out of date. Endpoints added in v2.3 are missing. Regenerate from OpenAPI spec."),
-				Reporter:    named{DisplayName: "Eve Johnson"},
-				Status:      status{Name: "Blocked", StatusCategory: named{Name: "Blocked"}},
-				Priority:    named{Name: "Lowest"},
-				Created:     "2024-11-02T10:00:00.000+0000",
-				Updated:     "2024-11-13T09:30:00.000+0000",
+				Summary: "Update API documentation",
+				Description: adfDoc(
+					"The REST API docs are out of date. Endpoints added in v2.3 are missing. Regenerate from OpenAPI spec.",
+				),
+				Reporter: named{DisplayName: "Eve Johnson"},
+				Status:   status{Name: "Blocked", StatusCategory: named{Name: "Blocked"}},
+				Priority: named{Name: "Lowest"},
+				Created:  "2024-11-02T10:00:00.000+0000",
+				Updated:  "2024-11-13T09:30:00.000+0000",
 			},
 		},
 	},
@@ -122,9 +133,9 @@ type transitionsResponse struct {
 }
 
 type transition struct {
-	ID   string         `json:"id"`
-	Name string         `json:"name"`
-	To   transitionTo   `json:"to"`
+	ID   string       `json:"id"`
+	Name string       `json:"name"`
+	To   transitionTo `json:"to"`
 }
 
 type transitionTo struct {
@@ -140,14 +151,22 @@ var transitionsByStatus = map[string][]transition{
 		{ID: "41", Name: "In Review", To: transitionTo{Name: "In Review", StatusCategory: named{Name: "In Progress"}}},
 	},
 	"To Do": {
-		{ID: "31", Name: "In Progress", To: transitionTo{Name: "In Progress", StatusCategory: named{Name: "In Progress"}}},
+		{
+			ID:   "31",
+			Name: "In Progress",
+			To:   transitionTo{Name: "In Progress", StatusCategory: named{Name: "In Progress"}},
+		},
 		{ID: "21", Name: "Done", To: transitionTo{Name: "Done", StatusCategory: named{Name: "Done"}}},
 	},
 	"Done": {
 		{ID: "11", Name: "Reopen", To: transitionTo{Name: "To Do", StatusCategory: named{Name: "To Do"}}},
 	},
 	"Blocked": {
-		{ID: "31", Name: "In Progress", To: transitionTo{Name: "In Progress", StatusCategory: named{Name: "In Progress"}}},
+		{
+			ID:   "31",
+			Name: "In Progress",
+			To:   transitionTo{Name: "In Progress", StatusCategory: named{Name: "In Progress"}},
+		},
 		{ID: "11", Name: "To Do", To: transitionTo{Name: "To Do", StatusCategory: named{Name: "To Do"}}},
 	},
 }
@@ -179,7 +198,7 @@ func main() {
 
 	http.HandleFunc("/rest/api/3/search/jql", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(data)
+		_ = json.NewEncoder(w).Encode(data)
 	})
 
 	// GET: return available transitions; POST: execute transition
@@ -209,7 +228,7 @@ func main() {
 				transitions = []transition{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
+			_ = json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
 
 		case "POST":
 			var body struct {
@@ -217,7 +236,7 @@ func main() {
 					ID string `json:"id"`
 				} `json:"transition"`
 			}
-			json.NewDecoder(r.Body).Decode(&body)
+			_ = json.NewDecoder(r.Body).Decode(&body)
 
 			// Find the transition and apply it
 			statusCat := iss.Fields.Status.StatusCategory.Name
@@ -236,7 +255,11 @@ func main() {
 	})
 
 	fmt.Fprintf(os.Stderr, "Mock Jira server listening on :%s\n", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	srv := &http.Server{
+		Addr:              ":" + port,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

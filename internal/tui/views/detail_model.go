@@ -162,12 +162,18 @@ func (m *DetailModel) View() tea.View {
 }
 
 func getContent(ticket model.Ticket, width int) string {
-	renderer, _ := glamour.NewTermRenderer(
+	renderer, err := glamour.NewTermRenderer(
 		glamour.WithStandardStyle("dracula"),
 		glamour.WithWordWrap(width),
 	)
+	if err != nil {
+		return fmt.Sprintf("[render error: %v]\n\n%s", err, ticket.Markdown)
+	}
 
-	rendered, _ := renderer.Render(ticket.Markdown)
+	rendered, err := renderer.Render(ticket.Markdown)
+	if err != nil {
+		return fmt.Sprintf("[render error: %v]\n\n%s", err, ticket.Markdown)
+	}
 
 	return rendered
 }

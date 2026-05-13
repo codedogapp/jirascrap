@@ -1,11 +1,26 @@
 package jira
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+
+	"github.com/codedogapp/jirascrap/internal/model"
 )
+
+func testClient(domain string, httpClient *http.Client) *Client {
+	return &Client{
+		domain:        domain,
+		email:         "test@example.com",
+		token:         "test-token",
+		http:          httpClient,
+		maxResults:    100,
+		maxConcurrent: 5,
+	}
+}
 
 func TestFetchTickets_Success(t *testing.T) {
 	rawResponse := `{
@@ -52,14 +67,9 @@ func TestFetchTickets_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		domain: server.URL,
-		email:  "test@example.com",
-		token:  "test-token",
-		http:   server.Client(),
-	}
+	client := testClient(server.URL, server.Client())
 
-	tickets, err := client.FetchTickets()
+	tickets, err := client.FetchTickets(context.Background())
 	if err != nil {
 		t.Fatalf("FetchTickets: %v", err)
 	}
@@ -108,13 +118,15 @@ func TestFetchTickets_APIError(t *testing.T) {
 	defer server.Close()
 
 	client := &Client{
-		domain: server.URL,
-		email:  "user@test.com",
-		token:  "bad-token",
-		http:   server.Client(),
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "bad-token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
 	}
 
-	_, err := client.FetchTickets()
+	_, err := client.FetchTickets(context.Background())
 	if err == nil {
 		t.Fatal("expected error for 401 response")
 	}
@@ -128,13 +140,15 @@ func TestFetchTickets_EmptyResponse(t *testing.T) {
 	defer server.Close()
 
 	client := &Client{
-		domain: server.URL,
-		email:  "user@test.com",
-		token:  "token",
-		http:   server.Client(),
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
 	}
 
-	tickets, err := client.FetchTickets()
+	tickets, err := client.FetchTickets(context.Background())
 	if err != nil {
 		t.Fatalf("FetchTickets: %v", err)
 	}
@@ -175,14 +189,9 @@ func TestFetchTransitions_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		domain: server.URL,
-		email:  "test@example.com",
-		token:  "test-token",
-		http:   server.Client(),
-	}
+	client := testClient(server.URL, server.Client())
 
-	transitions, err := client.FetchTransitions("PROJ-1")
+	transitions, err := client.FetchTransitions(context.Background(), "PROJ-1")
 	if err != nil {
 		t.Fatalf("FetchTransitions: %v", err)
 	}
@@ -209,13 +218,15 @@ func TestFetchTransitions_APIError(t *testing.T) {
 	defer server.Close()
 
 	client := &Client{
-		domain: server.URL,
-		email:  "user@test.com",
-		token:  "token",
-		http:   server.Client(),
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
 	}
 
-	_, err := client.FetchTransitions("BAD-1")
+	_, err := client.FetchTransitions(context.Background(), "BAD-1")
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
@@ -236,14 +247,9 @@ func TestDoTransition_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		domain: server.URL,
-		email:  "test@example.com",
-		token:  "test-token",
-		http:   server.Client(),
-	}
+	client := testClient(server.URL, server.Client())
 
-	err := client.DoTransition("PROJ-1", "21")
+	err := client.DoTransition(context.Background(), "PROJ-1", "21")
 	if err != nil {
 		t.Fatalf("DoTransition: %v", err)
 	}
@@ -260,14 +266,226 @@ func TestDoTransition_Error(t *testing.T) {
 	defer server.Close()
 
 	client := &Client{
-		domain: server.URL,
-		email:  "user@test.com",
-		token:  "token",
-		http:   server.Client(),
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
 	}
 
-	err := client.DoTransition("PROJ-1", "999")
+	err := client.DoTransition(context.Background(), "PROJ-1", "999")
 	if err == nil {
 		t.Fatal("expected error for 400 response")
+	}
+}
+
+func TestRetry_ServerError(t *testing.T) {
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		if n < 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"internal"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(searchResponse{Issues: []issue{}})
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
+	}
+
+	tickets, err := client.FetchTickets(context.Background())
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if len(tickets) != 0 {
+		t.Errorf("expected 0 tickets, got %d", len(tickets))
+	}
+	if got := attempts.Load(); got != 3 {
+		t.Errorf("expected 3 attempts, got %d", got)
+	}
+}
+
+func TestRetry_429_WithRetryAfter(t *testing.T) {
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		if n == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(searchResponse{Issues: []issue{}})
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
+	}
+
+	_, err := client.FetchTickets(context.Background())
+	if err != nil {
+		t.Fatalf("expected success after retry, got: %v", err)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("expected 2 attempts, got %d", got)
+	}
+}
+
+func TestRetry_NoRetryOn4xx(t *testing.T) {
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message":"Unauthorized"}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "bad-token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
+	}
+
+	_, err := client.FetchTickets(context.Background())
+	if err == nil {
+		t.Fatal("expected error for 401")
+	}
+	if got := attempts.Load(); got != 1 {
+		t.Errorf("expected 1 attempt (no retry on 4xx), got %d", got)
+	}
+}
+
+func TestRetry_ContextCancelled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	client := &Client{
+		domain:        server.URL,
+		email:         "user@test.com",
+		token:         "token",
+		http:          server.Client(),
+		maxResults:    100,
+		maxConcurrent: 5,
+	}
+
+	_, err := client.FetchTickets(ctx)
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+}
+
+func TestFetchAllEpicChildren_Concurrent(t *testing.T) {
+	var requestCount atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+"issues": [{
+"key": "CHILD-1",
+"fields": {
+"summary": "Child ticket",
+"reporter": {"displayName": "Bob"},
+"status": {"name": "Open", "statusCategory": {"name": "To Do"}},
+"priority": {"name": "Medium"},
+"created": "2024-01-01T00:00:00.000+0000",
+"updated": "2024-01-02T00:00:00.000+0000",
+"description": null
+}
+}]
+}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+	client.maxConcurrent = 2
+
+	tickets := []model.Ticket{
+		{ID: "EPIC-1", Type: "Epic"},
+		{ID: "EPIC-2", Type: "Epic"},
+		{ID: "EPIC-3", Type: "Epic"},
+		{ID: "TASK-1", Type: "Task"}, // not an epic, should be skipped
+	}
+
+	result, err := client.FetchAllEpicChildren(context.Background(), tickets)
+	if err != nil {
+		t.Fatalf("FetchAllEpicChildren: %v", err)
+	}
+
+	// Should have fetched 3 epics (not the task)
+	if int(requestCount.Load()) != 3 {
+		t.Errorf("expected 3 requests, got %d", requestCount.Load())
+	}
+
+	if len(result) != 3 {
+		t.Fatalf("expected 3 epic entries, got %d", len(result))
+	}
+
+	for _, epicKey := range []string{"EPIC-1", "EPIC-2", "EPIC-3"} {
+		children, ok := result[epicKey]
+		if !ok {
+			t.Errorf("missing children for %s", epicKey)
+			continue
+		}
+		if len(children) != 1 || children[0].ID != "CHILD-1" {
+			t.Errorf("unexpected children for %s: %+v", epicKey, children)
+		}
+	}
+}
+
+func TestFetchAllEpicChildren_CollectsErrors(t *testing.T) {
+	callCount := atomic.Int32{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		if n == 2 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("forbidden"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"issues": []}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+	client.maxConcurrent = 1 // serial to make failure deterministic
+
+	tickets := []model.Ticket{
+		{ID: "EPIC-1", Type: "Epic"},
+		{ID: "EPIC-2", Type: "Epic"},
+	}
+
+	result, err := client.FetchAllEpicChildren(context.Background(), tickets)
+	if err == nil {
+		t.Fatal("expected error from failed epic fetch")
+	}
+
+	// Should still have partial results
+	if len(result) != 1 {
+		t.Errorf("expected 1 successful result, got %d", len(result))
 	}
 }

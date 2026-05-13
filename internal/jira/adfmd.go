@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	adfBulletList  = "bulletList"
+	adfOrderedList = "orderedList"
+)
+
 // ADFToMarkdown converts an ADF document to Markdown text
 func ADFToMarkdown(node any) string {
 	return adfToMarkdown(node)
@@ -16,6 +21,9 @@ func ADFToMarkdown(node any) string {
 func MarkdownToADF(md string) any {
 	return markdownToADF(md)
 }
+
+// maxADFDepth limits recursion depth to prevent stack overflow on deeply nested documents.
+const maxADFDepth = 50
 
 func adfToMarkdown(node any) string {
 	doc, ok := node.(map[string]any)
@@ -28,7 +36,7 @@ func adfToMarkdown(node any) string {
 	}
 	var parts []string
 	for _, child := range content {
-		if s := blockToMarkdown(child, 0); s != "" {
+		if s := blockToMarkdown(child, 0, 0); s != "" {
 			parts = append(parts, s)
 		}
 	}
@@ -36,7 +44,10 @@ func adfToMarkdown(node any) string {
 }
 
 //nolint:gocognit
-func blockToMarkdown(node any, indent int) string {
+func blockToMarkdown(node any, indent int, depth int) string {
+	if depth > maxADFDepth {
+		return ""
+	}
 	block, ok := node.(map[string]any)
 	if !ok {
 		return ""
@@ -61,18 +72,18 @@ func blockToMarkdown(node any, indent int) string {
 		text = strings.ReplaceAll(text, "**", "")
 		return prefix + strings.Repeat("#", level) + " " + text
 
-	case "bulletList":
+	case adfBulletList:
 		var items []string
 		for _, item := range content {
-			items = append(items, listItemToMarkdown(item, indent, "- "))
+			items = append(items, listItemToMarkdown(item, indent, "- ", depth+1))
 		}
 		return strings.Join(items, "\n")
 
-	case "orderedList":
+	case adfOrderedList:
 		var items []string
 		for i, item := range content {
 			marker := fmt.Sprintf("%d. ", i+1)
-			items = append(items, listItemToMarkdown(item, indent, marker))
+			items = append(items, listItemToMarkdown(item, indent, marker, depth+1))
 		}
 		return strings.Join(items, "\n")
 
@@ -87,7 +98,7 @@ func blockToMarkdown(node any, indent int) string {
 	case "blockquote":
 		var lines []string
 		for _, child := range content {
-			md := blockToMarkdown(child, 0)
+			md := blockToMarkdown(child, 0, depth+1)
 			for _, line := range strings.Split(md, "\n") {
 				lines = append(lines, prefix+"> "+line)
 			}
@@ -105,7 +116,10 @@ func blockToMarkdown(node any, indent int) string {
 	}
 }
 
-func listItemToMarkdown(node any, indent int, marker string) string {
+func listItemToMarkdown(node any, indent int, marker string, depth int) string {
+	if depth > maxADFDepth {
+		return ""
+	}
 	item, ok := node.(map[string]any)
 	if !ok {
 		return ""
@@ -133,10 +147,10 @@ func listItemToMarkdown(node any, indent int, marker string) string {
 			} else {
 				parts = append(parts, strings.Repeat(" ", contIndent)+text)
 			}
-		case "bulletList", "orderedList":
-			parts = append(parts, blockToMarkdown(child, contIndent))
+		case adfBulletList, adfOrderedList:
+			parts = append(parts, blockToMarkdown(child, contIndent, depth+1))
 		default:
-			parts = append(parts, blockToMarkdown(child, contIndent))
+			parts = append(parts, blockToMarkdown(child, contIndent, depth+1))
 		}
 	}
 	return strings.Join(parts, "\n")
@@ -260,11 +274,12 @@ func tableToMarkdown(rows []any, indent int) string {
 	}
 
 	// Remove empty columns (glamour is weird with them)
+	headerLen := len(table[0])
 	emptyColumns := map[int]bool{}
-	for col := 0; col < len(table[0]); col++ {
+	for col := range headerLen {
 		empty := true
 		for _, row := range table[1:] {
-			if row[col] != "" {
+			if col < len(row) && row[col] != "" {
 				empty = false
 				break
 			}
@@ -277,9 +292,14 @@ func tableToMarkdown(rows []any, indent int) string {
 	var filteredTable [][]string
 	for _, row := range table {
 		var filteredRow []string
-		for i, cell := range row {
-			if !emptyColumns[i] {
-				filteredRow = append(filteredRow, cell)
+		for i := range headerLen {
+			if emptyColumns[i] {
+				continue
+			}
+			if i < len(row) {
+				filteredRow = append(filteredRow, row[i])
+			} else {
+				filteredRow = append(filteredRow, "")
 			}
 		}
 		filteredTable = append(filteredTable, filteredRow)
@@ -471,7 +491,7 @@ func parseParagraph(lines []string, i *int) any {
 	text := strings.Join(paraLines, "\n")
 	return map[string]any{
 		"type":    "paragraph",
-		"content": parseInlineWithHardBreaks(text),
+		"content": parseInline(text),
 	}
 }
 
@@ -484,22 +504,20 @@ func isBlockBreak(trimmed string) bool {
 }
 
 var (
-	headingRe     = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
-	orderedListRe = regexp.MustCompile(`^\d+\.\s+`)
-	boldRe        = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	italicRe      = regexp.MustCompile(`(?:^|[^*])\*([^*]+?)\*(?:[^*]|$)`)
-	codeRe        = regexp.MustCompile("`([^`]+)`")
-	strikeRe      = regexp.MustCompile(`~~(.+?)~~`)
-	underlineRe   = regexp.MustCompile(`<u>(.+?)</u>`)
-	linkRe        = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
-	mentionRe     = regexp.MustCompile(`\[@([^\]]+)\]\(accountid:([^)]+)\)`)
+	headingRe       = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
+	orderedListRe   = regexp.MustCompile(`^\d+\.\s+`)
+	boldRe          = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	italicRe        = regexp.MustCompile(`(?:^|[^*])\*([^*]+?)\*(?:[^*]|$)`)
+	codeRe          = regexp.MustCompile("`([^`]+)`")
+	strikeRe        = regexp.MustCompile(`~~(.+?)~~`)
+	underlineRe     = regexp.MustCompile(`<u>(.+?)</u>`)
+	linkRe          = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	mentionRe       = regexp.MustCompile(`\[@([^\]]+)\]\(accountid:([^)]+)\)`)
+	bulletMarkerRe  = regexp.MustCompile(`^(\s*)- (.*)$`)
+	orderedMarkerRe = regexp.MustCompile(`^(\s*)\d+\.\s+(.*)$`)
 )
 
 func parseInline(text string) []any {
-	return parseInlineWithHardBreaks(text)
-}
-
-func parseInlineWithHardBreaks(text string) []any {
 	segments := strings.Split(text, "  \n")
 	var result []any
 	for si, segment := range segments {
@@ -606,11 +624,11 @@ func parseInlineSegment(text string) []any {
 }
 
 func parseList(lines []string, idx *int, listType string) map[string]any {
-	adfType := "bulletList"
-	markerRe := regexp.MustCompile(`^(\s*)- (.*)$`)
+	adfType := adfBulletList
+	markerRe := bulletMarkerRe
 	if listType == "ordered" {
-		adfType = "orderedList"
-		markerRe = regexp.MustCompile(`^(\s*)\d+\.\s+(.*)$`)
+		adfType = adfOrderedList
+		markerRe = orderedMarkerRe
 	}
 
 	var items []any

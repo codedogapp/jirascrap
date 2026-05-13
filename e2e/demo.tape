@@ -1,5 +1,5 @@
 # jirascrap e2e demo
-# Exercises: list → select → detail → tag → todo → back → status → refresh → debug
+# Exercises: list → select → detail → tag → todo → back → status → refresh
 
 Output e2e/demo.gif
 Set Shell bash
@@ -86,14 +86,6 @@ Sleep 2s
 # --- Refresh from Jira ---
 Type "r"
 Sleep 3s
-
-# --- Open debug overlay ---
-Type "d"
-Sleep 2s
-
-# Close debug
-Escape
-Sleep 1s
 
 # --- Quit ---
 Ctrl+c

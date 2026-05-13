@@ -1,10 +1,20 @@
+// Package jira provides an HTTP client for the Jira REST API v3.
+//
+// API assumptions:
+//   - Authentication: Basic auth with email + API token (Atlassian Cloud).
+//   - Search: POST /rest/api/3/search/jql — accepts JQL in request body.
+//   - Transitions: GET/POST /rest/api/3/issue/{key}/transitions.
+//   - Rate limiting: 429 responses include optional Retry-After header (seconds).
+//   - Pagination: Not implemented — assumes < maxResults issues per query.
+//   - ADF: Description field uses Atlassian Document Format (v1).
+//   - Epic children: Found via JQL `"Epic Link" = X OR parent = X`.
 package jira
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -14,86 +24,49 @@ import (
 
 const defaultJQL = `assignee = currentUser() AND statusCategory != Done AND status != 'TO DESCRIBE' ORDER BY status DESC`
 
+// TicketClient defines the operations used by the TUI to interact with Jira.
+type TicketClient interface {
+	FetchTickets(ctx context.Context) ([]model.Ticket, error)
+	FetchEpicChildren(ctx context.Context, epicKey string) ([]model.Ticket, error)
+	FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error)
+	FetchTransitions(ctx context.Context, issueKey string) ([]Transition, error)
+	DoTransition(ctx context.Context, issueKey string, transitionID string) error
+}
+
+// Client is the Jira REST API v3 client.
 type Client struct {
-	domain string
-	email  string
-	token  string
-	http   *http.Client
+	domain        string
+	email         string
+	token         string
+	http          *http.Client
+	maxResults    int
+	maxConcurrent int
 }
 
 func NewClient(cfg *config.Config) *Client {
 	return &Client{
-		domain: cfg.Domain,
-		email:  cfg.Email,
-		token:  cfg.APIToken,
-		http:   &http.Client{Timeout: 15 * time.Second},
+		domain:        cfg.Domain,
+		email:         cfg.Email,
+		token:         cfg.APIToken,
+		http:          &http.Client{Timeout: 15 * time.Second},
+		maxResults:    100,
+		maxConcurrent: 5,
 	}
 }
 
-// doRequest executes an authenticated request and returns the response body.
-// It checks that the status code is one of the accepted codes.
-func (c *Client) doRequest(method, url string, body any, acceptedStatus ...int) ([]byte, error) {
-	var reqBody io.Reader
-	if body != nil {
-		jsonBytes, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request: %w", err)
-		}
-		reqBody = bytes.NewBuffer(jsonBytes)
-	}
-
-	req, err := http.NewRequest(method, url, reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.SetBasicAuth(c.email, c.token)
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("network error: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if len(acceptedStatus) == 0 {
-		acceptedStatus = []int{http.StatusOK}
-	}
-	accepted := false
-	for _, s := range acceptedStatus {
-		if resp.StatusCode == s {
-			accepted = true
-			break
-		}
-	}
-	if !accepted {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("jira api error [%d]: %s", resp.StatusCode, string(respBody))
-	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-	return respBody, nil
+func (c *Client) FetchTickets(ctx context.Context) ([]model.Ticket, error) {
+	return c.fetchTickets(ctx, defaultJQL)
 }
 
-func (c *Client) FetchTickets() ([]model.Ticket, error) {
-	return c.fetchTickets(defaultJQL)
-}
-
-func (c *Client) FetchEpicChildren(epicKey string) ([]model.Ticket, error) {
+func (c *Client) FetchEpicChildren(ctx context.Context, epicKey string) ([]model.Ticket, error) {
 	jql := fmt.Sprintf(`"Epic Link" = %s OR parent = %s`, epicKey, epicKey)
-	return c.fetchTickets(jql)
+	return c.fetchTickets(ctx, jql)
 }
 
-func (c *Client) fetchTickets(jql string) ([]model.Ticket, error) {
+func (c *Client) fetchTickets(ctx context.Context, jql string) ([]model.Ticket, error) {
 	url := fmt.Sprintf("%s/rest/api/3/search/jql", c.domain)
 	reqBody := searchRequest{
-		MaxResults: 100,
+		MaxResults: c.maxResults,
 		JQL:        jql,
 		Fields: []string{
 			"summary",
@@ -108,7 +81,7 @@ func (c *Client) fetchTickets(jql string) ([]model.Ticket, error) {
 		},
 	}
 
-	respBody, err := c.doRequest("POST", url, reqBody)
+	respBody, err := c.doRequest(ctx, "POST", url, reqBody)
 	if err != nil {
 		return nil, err
 	}
@@ -137,10 +110,10 @@ func (c *Client) fetchTickets(jql string) ([]model.Ticket, error) {
 	return tickets, nil
 }
 
-func (c *Client) FetchTransitions(issueKey string) ([]Transition, error) {
+func (c *Client) FetchTransitions(ctx context.Context, issueKey string) ([]Transition, error) {
 	url := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.domain, issueKey)
 
-	respBody, err := c.doRequest("GET", url, nil)
+	respBody, err := c.doRequest(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -152,28 +125,35 @@ func (c *Client) FetchTransitions(issueKey string) ([]Transition, error) {
 
 	var transitions []Transition
 	for _, t := range result.Transitions {
-		transitions = append(transitions, Transition{
-			ID:               t.ID,
-			Name:             t.Name,
-			ToStatus:         t.To.Name,
-			ToStatusCategory: t.To.StatusCategory.Name,
-		})
+		transitions = append(
+			transitions,
+			Transition{
+				ID:               t.ID,
+				Name:             t.Name,
+				ToStatus:         t.To.Name,
+				ToStatusCategory: t.To.StatusCategory.Name,
+			},
+		)
 	}
 
 	return transitions, nil
 }
 
-func (c *Client) DoTransition(issueKey string, transitionID string) error {
+func (c *Client) DoTransition(ctx context.Context, issueKey string, transitionID string) error {
 	url := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.domain, issueKey)
 
-	_, err := c.doRequest("POST", url,
+	_, err := c.doRequest(
+		ctx,
+		"POST",
+		url,
 		transitionRequest{Transition: transitionRef{ID: transitionID}},
-		http.StatusOK, http.StatusNoContent,
+		http.StatusOK,
+		http.StatusNoContent,
 	)
 	return err
 }
 
-func (c *Client) FetchAllEpicChildren(tickets []model.Ticket) (map[string][]model.Ticket, error) {
+func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error) {
 	type result struct {
 		epicKey  string
 		children []model.Ticket
@@ -191,31 +171,42 @@ func (c *Client) FetchAllEpicChildren(tickets []model.Ticket) (map[string][]mode
 		return map[string][]model.Ticket{}, nil
 	}
 
-	const maxConcurrent = 5
-	sem := make(chan struct{}, maxConcurrent)
+	sem := make(chan struct{}, c.maxConcurrent)
 	ch := make(chan result, len(epics))
 
+	launched := 0
 	for _, t := range epics {
+		if ctx.Err() != nil {
+			break
+		}
 		sem <- struct{}{}
+		launched++
 		go func(epicKey string) {
-			defer func() { <-sem }()
-			children, err := c.FetchEpicChildren(epicKey)
+			defer func() {
+				<-sem
+				if r := recover(); r != nil {
+					ch <- result{epicKey: epicKey, err: fmt.Errorf("panic fetching epic %s: %v", epicKey, r)}
+				}
+			}()
+			children, err := c.FetchEpicChildren(ctx, epicKey)
 			ch <- result{epicKey: epicKey, children: children, err: err}
 		}(t.ID)
 	}
 
 	out := make(map[string][]model.Ticket, len(epics))
-	var firstErr error
-	for range epics {
+	var errs []error
+	for range launched {
 		r := <-ch
 		if r.err != nil {
-			if firstErr == nil {
-				firstErr = r.err
-			}
+			errs = append(errs, fmt.Errorf("epic %s: %w", r.epicKey, r.err))
 			continue
 		}
 		out[r.epicKey] = r.children
 	}
 
-	return out, firstErr
+	if ctx.Err() != nil {
+		errs = append(errs, ctx.Err())
+	}
+
+	return out, errors.Join(errs...)
 }

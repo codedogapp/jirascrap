@@ -4,13 +4,14 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"time"
 
 	"github.com/codedogapp/jirascrap/internal/logger"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
+	_ "modernc.org/sqlite"
 )
 
-const SQLDriver string = "sqlite3"
+const SQLDriver string = "sqlite"
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -23,6 +24,14 @@ func Open(dbPath string) (*DB, error) {
 	database, err := sql.Open(SQLDriver, dbPath)
 	if err != nil {
 		return nil, err
+	}
+
+	database.SetMaxOpenConns(5)
+	database.SetMaxIdleConns(2)
+	database.SetConnMaxLifetime(time.Hour)
+
+	if _, err := database.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return nil, fmt.Errorf("db: failed to enable foreign keys: %w", err)
 	}
 
 	goose.SetBaseFS(embedMigrations)

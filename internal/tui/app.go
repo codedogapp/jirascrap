@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,21 +13,28 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+// navLevel tracks whether user is at root ticket list or inside an epic.
+type navLevel int
+
+const (
+	navRoot navLevel = iota
+	navEpic
+)
+
 type AppModel struct {
 	// Dependencies
-	jiraClient *jira.Client
-	store      store.MetaStore
-	config     *config.Config
+	jiraClient  jira.TicketClient
+	tagStore    store.TagStore
+	todoStore   store.TodoStore
+	ticketCache store.TicketCache
+	config      *config.Config
 
 	// State
 	list         *views.ListModel
 	previousList *views.ListModel
+	navLevel     navLevel
 	activeModel  views.ActiveModel
-	debugModel   *views.DebugModel
-	tagModel     *views.TagModel
-	todoModel    *views.TodoModel
-	statusModel  *views.StatusModel
-	toastModel   *views.ToastModel
+	popups       *PopupManager
 	epicChildren map[string][]model.Ticket
 	err          error
 	syncing      bool
@@ -37,24 +45,37 @@ type AppModel struct {
 	height int
 }
 
-func NewApp(client *jira.Client, s store.MetaStore, cfg *config.Config) *AppModel {
+func NewApp(
+	client jira.TicketClient,
+	tags store.TagStore,
+	todos store.TodoStore,
+	cache store.TicketCache,
+	cfg *config.Config,
+) *AppModel {
 	styles := views.NewStyles()
 	listModel := views.NewListModel(nil, styles.App)
-	debugModel := views.NewDebugModel(0, 0)
-	return &AppModel{
+	tagModel := views.NewTagModel(0, 0, nil)
+	todoModel := views.NewTodoModel(0, 0, "", nil)
+	statusModel := views.NewStatusModel(0, 0)
+	toastModel := views.NewToastModel(0, 0)
+
+	app := &AppModel{
 		jiraClient:   client,
-		store:        s,
+		tagStore:     tags,
+		todoStore:    todos,
+		ticketCache:  cache,
 		config:       cfg,
 		list:         listModel,
+		navLevel:     navRoot,
 		activeModel:  listModel,
-		debugModel:   debugModel,
-		tagModel:     views.NewTagModel(0, 0, nil),
-		todoModel:    views.NewTodoModel(0, 0, "", nil),
-		statusModel:  views.NewStatusModel(0, 0),
-		toastModel:   views.NewToastModel(0, 0),
+		popups:       newPopupManager(tagModel, todoModel, statusModel, toastModel),
 		epicChildren: make(map[string][]model.Ticket),
 		styles:       styles,
 	}
+
+	app.popups.SetKeyHandlers(app.handleTagKey, app.handleTodoKey, app.handleStatusKey)
+
+	return app
 }
 
 func (m *AppModel) Init() tea.Cmd {
@@ -105,6 +126,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tagSavedMsg:
 		return m.handleTagSaved(msg)
 
+	case todoSavedMsg:
+		return m, m.popups.toast.Show("✓ Todos saved")
+
 	case copilotLaunchedMsg:
 		return m.handleCopilotLaunched(msg)
 
@@ -112,7 +136,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTransitionsLoaded(msg)
 
 	case transitionsErrorMsg:
-		m.statusModel.Hide()
+		m.popups.status.Hide()
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
 	case views.StatusTransitionMsg:
@@ -125,102 +149,76 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
 	case views.ToastTimeoutMsg:
-		m.toastModel.Hide()
+		if m.popups.toast.ShouldHide(msg) {
+			m.popups.toast.Hide()
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:
-		cmd := m.handleQuit(msg)
-		if cmd != nil {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleDebug(msg); consumed {
-			return m, cmd
-		}
-		// Route keys to popups when active
-		if m.tagModel.IsVisible() {
-			return m.handleTagKey(msg)
-		}
-		if m.todoModel.IsVisible() {
-			return m.handleTodoKey(msg)
-		}
-		if m.statusModel.IsVisible() {
-			return m.handleStatusKey(msg)
-		}
-		if consumed, cmd := m.handleRefresh(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleExitEpic(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleGoHome(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleOpenInBrowser(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleToggleTag(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleToggleTodo(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleToggleStatus(msg); consumed {
-			return m, cmd
-		}
-		if consumed, cmd := m.handleSendToCopilot(msg); consumed {
-			return m, cmd
-		}
-		m.activeModel, cmd = m.activeModel.Update(msg)
-		return m, cmd
+		return m.handleKeyPress(msg)
 
 	default:
-		// Route non-key messages to active popup for text input blinking etc.
-		if m.tagModel.IsVisible() {
-			return m, m.tagModel.UpdateMsg(msg)
-		}
-		if m.todoModel.IsVisible() && m.todoModel.IsAdding() {
-			return m, m.todoModel.UpdateMsg(msg)
-		}
-		if mu, ok := m.activeModel.(views.MsgUpdater); ok {
-			return m, mu.UpdateMsg(msg)
-		}
+		return m.handleOtherMsg(msg)
 	}
+}
 
+func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if cmd := m.handleQuit(msg); cmd != nil {
+		return m, cmd
+	}
+	if consumed, cmd := m.popups.RouteKeyPress(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleRefresh(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleExitEpic(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleGoHome(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleOpenInBrowser(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleToggleTag(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleToggleTodo(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleToggleStatus(msg); consumed {
+		return m, cmd
+	}
+	if consumed, cmd := m.handleSendToCopilot(msg); consumed {
+		return m, cmd
+	}
+	var cmd tea.Cmd
+	m.activeModel, cmd = m.activeModel.Update(msg)
+	return m, cmd
+}
+
+func (m *AppModel) handleOtherMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.popups.RouteMsg(msg); handled {
+		return m, cmd
+	}
+	if mu, ok := m.activeModel.(views.MsgUpdater); ok {
+		return m, mu.UpdateMsg(msg)
+	}
 	return m, nil
 }
 
 func (m *AppModel) View() tea.View {
 	if m.err != nil {
-		return tea.NewView(fmt.Sprintf("\nError: %v\n\nPress 'q' to quit.", m.err))
+		return tea.NewView(fmt.Sprintf("\nError: %v\n\nPress 'r' to retry or 'q' to quit.", m.err))
 	}
 
 	base := m.styles.App.Render(m.activeModel.View().Content)
 
-	debug := m.debugModel.View()
-	todoOverlay := m.todoModel.View()
-	tagOverlay := m.tagModel.View()
-	statusOverlay := m.statusModel.View()
-	toastOverlay := m.toastModel.View()
-
-	hasOverlay := debug != nil || todoOverlay != nil || tagOverlay != nil || statusOverlay != nil || toastOverlay != nil
-	if hasOverlay {
-		layers := []*lipgloss.Layer{lipgloss.NewLayer(base)}
-		if todoOverlay != nil {
-			layers = append(layers, todoOverlay)
-		}
-		if tagOverlay != nil {
-			layers = append(layers, tagOverlay)
-		}
-		if statusOverlay != nil {
-			layers = append(layers, statusOverlay)
-		}
-		if debug != nil {
-			layers = append(layers, debug)
-		}
-		if toastOverlay != nil {
-			layers = append(layers, toastOverlay)
-		}
-		v := tea.NewView(lipgloss.NewCompositor(layers...).Render())
+	layers := m.popups.Layers()
+	if len(layers) > 0 {
+		all := append([]*lipgloss.Layer{lipgloss.NewLayer(base)}, layers...)
+		v := tea.NewView(lipgloss.NewCompositor(all...).Render())
 		v.AltScreen = true
 		return v
 	}
@@ -230,9 +228,23 @@ func (m *AppModel) View() tea.View {
 	return v
 }
 
-func Run(client *jira.Client, s store.MetaStore, cfg *config.Config) error {
-	app := NewApp(client, s, cfg)
+func Run(
+	ctx context.Context,
+	client jira.TicketClient,
+	tags store.TagStore,
+	todos store.TodoStore,
+	cache store.TicketCache,
+	cfg *config.Config,
+) error {
+	app := NewApp(client, tags, todos, cache, cfg)
 	p := tea.NewProgram(app)
+
+	// Quit TUI gracefully when context is cancelled (e.g. SIGINT/SIGTERM).
+	go func() {
+		<-ctx.Done()
+		p.Quit()
+	}()
+
 	_, err := p.Run()
 	if err != nil {
 		return fmt.Errorf("running TUI: %w", err)

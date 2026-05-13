@@ -127,3 +127,42 @@ func TestLoad_AllMissing(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_ValidateHTTPS(t *testing.T) {
+	env := requiredEnv()
+	env["JIRA_BASE_URL"] = "http://example.atlassian.net"
+	setEnv(t, env)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for non-HTTPS URL")
+	}
+	if !strings.Contains(err.Error(), "HTTPS") {
+		t.Errorf("error should mention HTTPS: %v", err)
+	}
+}
+
+func TestLoad_ValidateTrailingSlash(t *testing.T) {
+	env := requiredEnv()
+	env["JIRA_BASE_URL"] = "https://example.atlassian.net/"
+	setEnv(t, env)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for trailing slash")
+	}
+	if !strings.Contains(err.Error(), "trailing slash") {
+		t.Errorf("error should mention trailing slash: %v", err)
+	}
+}
+
+func TestValidate_ValidConfig(t *testing.T) {
+	cfg := &Config{
+		Domain:   "https://example.atlassian.net",
+		Email:    "user@example.com",
+		APIToken: "token",
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

@@ -8,12 +8,14 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/codedogapp/jirascrap/internal/logger"
 	"github.com/codedogapp/jirascrap/internal/model"
 	"github.com/codedogapp/jirascrap/internal/tmux"
 	"github.com/codedogapp/jirascrap/internal/tui/keymaps"
 )
 
-var copilotSession = tmux.NewSession("copilot")
+// copilotSession is always valid — "copilot" passes sanitizeName.
+var copilotSession, _ = tmux.NewSession("copilot")
 
 func (m *AppModel) handleSendToCopilot(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if !key.Matches(msg, keymaps.DefaultKeyMap.SendToCopilot) {
@@ -25,7 +27,10 @@ func (m *AppModel) handleSendToCopilot(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	todos, _ := m.store.GetTodos(ticket.ID)
+	todos, err := m.todoStore.GetTodos(ticket.ID)
+	if err != nil {
+		logger.Log.Warn(fmt.Sprintf("failed to load todos for copilot: %v", err))
+	}
 
 	return true, m.sendToCopilotCmd(ticket, todos)
 }
@@ -42,7 +47,7 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 		}
 
 		// Ensure tmux session
-		if err := os.MkdirAll(workspace, 0755); err != nil {
+		if err := os.MkdirAll(workspace, 0750); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("creating workspace: %w", err)}
 		}
 		if err := copilotSession.Ensure(workspace); err != nil {
@@ -56,21 +61,24 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 		}
 
 		// Skip if copilot already running
-		if strings.Contains(copilotSession.WindowCommand(windowID), "copilot") {
+		cmd, err := copilotSession.WindowCommand(windowID)
+		if err != nil {
+			logger.Log.Warn(fmt.Sprintf("failed to check window command: %v", err))
+		} else if strings.Contains(cmd, "copilot") {
 			return copilotLaunchedMsg{ticketID: ticket.ID}
 		}
 
 		// Launch copilot
-		cdCmd := fmt.Sprintf("cd %s", workspace)
+		cdCmd := fmt.Sprintf("cd %s", shellQuote(workspace))
 		if err := copilotSession.SendKeys(windowID, cdCmd); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("cd to workspace: %w", err)}
 		}
 
-		cmd := fmt.Sprintf(
-			"copilot --plan --model %s --allow-all-paths -i \"$(cat '%s')\"",
-			copilotModel, promptPath,
+		copilotCmd := fmt.Sprintf(
+			"copilot --plan --model %s --allow-all-paths -i \"$(cat %s)\"",
+			shellQuote(copilotModel), shellQuote(promptPath),
 		)
-		if err := copilotSession.SendKeys(windowID, cmd); err != nil {
+		if err := copilotSession.SendKeys(windowID, copilotCmd); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("launching copilot: %w", err)}
 		}
 
@@ -79,16 +87,18 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 }
 
 func resolveWindow(ticketID, workspace string) (string, error) {
-	if id, ok := copilotSession.FindWindow(ticketID); ok {
+	if id, ok, err := copilotSession.FindWindow(ticketID); err != nil {
+		return "", fmt.Errorf("find window %q: %w", ticketID, err)
+	} else if ok {
 		return id, nil
 	}
 
 	// Claim first unused window if session was just created
-	if id, name, ok := copilotSession.FirstWindow(); ok {
-		if !strings.Contains(name, "-") {
-			_ = copilotSession.RenameWindow(id, ticketID)
-			return id, nil
-		}
+	if id, name, ok, err := copilotSession.FirstWindow(); err != nil {
+		return "", fmt.Errorf("first window: %w", err)
+	} else if ok && !strings.Contains(name, "-") {
+		_ = copilotSession.RenameWindow(id, ticketID)
+		return id, nil
 	}
 
 	return copilotSession.NewWindow(ticketID, workspace)
@@ -96,14 +106,14 @@ func resolveWindow(ticketID, workspace string) (string, error) {
 
 func writePromptFile(ticket model.Ticket, todos []model.Todo) (string, error) {
 	dir := filepath.Join(os.TempDir(), "jirascrap")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return "", fmt.Errorf("creating prompt dir: %w", err)
 	}
 
 	sanitizedID := strings.ReplaceAll(strings.ToLower(ticket.ID), "/", "-")
 	path := filepath.Join(dir, fmt.Sprintf("%s.md", sanitizedID))
 
-	if err := os.WriteFile(path, []byte(buildCopilotPrompt(ticket, todos)), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(buildCopilotPrompt(ticket, todos)), 0600); err != nil {
 		return "", fmt.Errorf("writing prompt: %w", err)
 	}
 
@@ -121,8 +131,8 @@ func buildCopilotPrompt(ticket model.Ticket, todos []model.Todo) string {
 	b.WriteString(fmt.Sprintf("- **Type:** %s\n", ticket.Type))
 	b.WriteString(fmt.Sprintf("- **Reporter:** %s\n", ticket.Reporter))
 
-	if ticket.EpicID != "" {
-		b.WriteString(fmt.Sprintf("- **Epic:** %s\n", ticket.EpicID))
+	if ticket.EpicID != nil {
+		b.WriteString(fmt.Sprintf("- **Epic:** %s\n", *ticket.EpicID))
 	}
 
 	if len(ticket.Tags) > 0 {
@@ -153,10 +163,15 @@ func buildCopilotPrompt(ticket model.Ticket, todos []model.Todo) string {
 
 func (m *AppModel) handleCopilotLaunched(msg copilotLaunchedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
-		return m, m.toastModel.Show(fmt.Sprintf("✗ %s", msg.err))
+		return m, m.popups.toast.Show(fmt.Sprintf("✗ %s", msg.err))
 	}
 
-	return m, m.toastModel.Show(
+	return m, m.popups.toast.Show(
 		fmt.Sprintf("✓ Copilot launched for %s — tmux attach -t %s", msg.ticketID, copilotSession.Name),
 	)
+}
+
+// shellQuote wraps a string in single quotes, escaping embedded single quotes.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }

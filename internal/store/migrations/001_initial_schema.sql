@@ -7,4 +7,3 @@ CREATE TABLE issue_tags (
 
 -- +goose Down
 DROP TABLE issue_tags;
-DROP TABLE issue_notes;

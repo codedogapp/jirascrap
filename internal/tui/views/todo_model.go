@@ -37,8 +37,6 @@ type TodoModel struct {
 	contentHeight int
 }
 
-const todoHeightRatio = 2
-
 func NewTodoModel(contentWidth, contentHeight int, ticketID string, todos []model.Todo) *TodoModel {
 	w := contentWidth / RatioWidth
 	h := contentHeight / todoHeightRatio
@@ -202,26 +200,16 @@ func (m *TodoModel) View() *lipgloss.Layer {
 	}
 	content += "\n" + m.help.View(keymaps.DefaultTodoKeyMap)
 
-	contentStyled := lipgloss.NewStyle().Padding(1, 1).Render(content)
+	actualWidth := int(float64(m.contentWidth) * PopupWidthScale)
 
-	actualWidth := int(float64(m.contentWidth) * 0.7)
-	popupView := tagViewPopUp.Width(actualWidth).Render(contentStyled)
-	popupWidth := lipgloss.Width(popupView)
-
-	dashCount := popupWidth - lipgloss.Width("╭─ TODO ╮")
-	dashCount = max(dashCount, 0)
-
-	dashes := strings.Repeat("─", dashCount)
-	topLine := topBorder.Render("╭─ ") +
-		popUpTitle.Render("TODO") +
-		topBorder.Render(" "+dashes+"╮")
-
-	full := topLine + "\n" + popupView
-
-	return lipgloss.NewLayer(full).
-		X((m.contentWidth - popupWidth) / 2).
-		Y((m.contentHeight - m.contentHeight/todoHeightRatio) / 2).
-		Z(1)
+	return RenderPopupLayer(
+		content,
+		"TODO",
+		(m.contentWidth-actualWidth)/2,
+		(m.contentHeight-m.contentHeight/todoHeightRatio)/2,
+		ZPopup,
+		actualWidth,
+	)
 }
 
 type todoDelegate struct{}
