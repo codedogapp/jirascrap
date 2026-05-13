@@ -1,22 +1,19 @@
 package store
 
-//go:generate sqlc generate -f ../../sqlc.yaml
+//go:generate go tool sqlc generate -f ../../sqlc.yaml
 
 import (
 	"database/sql"
-	"embed"
 	"fmt"
 	"time"
 
 	"github.com/codedogapp/jirascrap/internal/logger"
+	"github.com/codedogapp/jirascrap/internal/store/migrations"
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
 
 const SQLDriver string = "sqlite"
-
-//go:embed migrations/*.sql
-var embedMigrations embed.FS
 
 type DB struct {
 	*sql.DB
@@ -36,7 +33,7 @@ func Open(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("db: failed to enable foreign keys: %w", err)
 	}
 
-	goose.SetBaseFS(embedMigrations)
+	goose.SetBaseFS(migrations.FS)
 
 	err = goose.SetDialect(SQLDriver)
 	goose.SetLogger(logger.GooseLoggerAdapter{})
@@ -44,7 +41,7 @@ func Open(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("db: failed to set dialect: %w", err)
 	}
 
-	err = goose.Up(database, "migrations")
+	err = goose.Up(database, ".")
 	if err != nil {
 		return nil, fmt.Errorf("db: failed to run migrations: %w", err)
 	}

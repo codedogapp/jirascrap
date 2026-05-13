@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/codedogapp/jirascrap/internal/store/migrations"
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
@@ -24,12 +25,12 @@ func setupTestDB(t *testing.T) testStores {
 		db.Close()
 	})
 
-	goose.SetBaseFS(embedMigrations)
+	goose.SetBaseFS(migrations.FS)
 	if err := goose.SetDialect("sqlite"); err != nil {
 		t.Fatalf("set dialect: %v", err)
 	}
 	goose.SetLogger(goose.NopLogger())
-	if err := goose.Up(db, "migrations"); err != nil {
+	if err := goose.Up(db, "."); err != nil {
 		t.Fatalf("run migrations: %v", err)
 	}
 

@@ -16,11 +16,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install sqlc
-        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+      - name: Generate schema
+        run: go run ./cmd/genschema
 
       - name: Generate
-        run: sqlc generate
+        run: go tool sqlc generate
 
       - name: Check formatting
         run: |

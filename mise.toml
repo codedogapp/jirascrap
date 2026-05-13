@@ -1,9 +1,13 @@
 [tools]
 go = "latest"
-"go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "latest"
+
+[tasks.schema]
+run = "go run ./cmd/genschema"
+description = "Generate schema.sql from goose migrations"
 
 [tasks.generate]
-run = "sqlc generate"
+run = "go tool sqlc generate"
+depends = ["schema"]
 description = "Run sqlc codegen"
 
 [tasks.build]
