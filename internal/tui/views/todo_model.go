@@ -114,6 +114,7 @@ func (m *TodoModel) updateAdding(msg tea.KeyPressMsg) tea.Cmd {
 		}
 
 		return m.todosChangedCmd()
+
 	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Cancel):
 		m.textInput.SetValue("")
 		m.adding = false
@@ -131,6 +132,7 @@ func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
 		m.adding = true
 		m.textInput.SetValue("")
 		return m.textInput.Focus()
+
 	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Toggle):
 		if i, ok := m.list.SelectedItem().(TodoItem); ok {
 			idx := m.list.Index()
@@ -140,6 +142,7 @@ func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
 			m.list.SetItems(items)
 		}
 		return m.todosChangedCmd()
+
 	case key.Matches(msg, keymaps.DefaultTodoKeyMap.Delete):
 		idx := m.list.Index()
 		items := m.list.Items()
@@ -148,6 +151,7 @@ func (m *TodoModel) updateNormal(msg tea.KeyPressMsg) tea.Cmd {
 			m.list.SetItems(items)
 		}
 		return m.todosChangedCmd()
+
 	case key.Matches(msg, keymaps.DefaultKeyMap.Quit):
 		return nil
 	}

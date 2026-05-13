@@ -55,5 +55,6 @@ func (s *SqliteTagStore) GetUniqueTags() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get unique tags: %w", err)
 	}
+
 	return tags, nil
 }

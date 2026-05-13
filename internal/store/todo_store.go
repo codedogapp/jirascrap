@@ -33,7 +33,11 @@ func (s *SqliteTodoStore) GetTodos(ticketID string) ([]model.Todo, error) {
 
 	todos := make([]model.Todo, len(rows))
 	for i, r := range rows {
-		todos[i] = model.Todo{ID: int(r.ID), Title: r.Title, Done: r.Done != 0}
+		todos[i] = model.Todo{
+			ID:    int(r.ID),
+			Title: r.Title,
+			Done:  r.Done != 0,
+		}
 	}
 	return todos, nil
 }

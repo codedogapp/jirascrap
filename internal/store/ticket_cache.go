@@ -68,9 +68,19 @@ func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
 	tickets := make([]model.Ticket, 0, len(rows))
 	for _, r := range rows {
 		tags, _ := r.Tags.(string)
-		t, err := cachedTicketRowToModel(r.ID, r.Summary, r.Reporter, r.Status,
-			r.StatusCategory, r.Priority, r.Type, r.CreatedAt, r.UpdatedAt,
-			r.Markdown, tags)
+		t, err := cachedTicketRowToModel(
+			r.ID,
+			r.Summary,
+			r.Reporter,
+			r.Status,
+			r.StatusCategory,
+			r.Priority,
+			r.Type,
+			r.CreatedAt,
+			r.UpdatedAt,
+			r.Markdown,
+			tags,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("get cached tickets: %w", err)
 		}
@@ -115,15 +125,26 @@ func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticke
 	result := make(map[string][]model.Ticket)
 	for _, r := range rows {
 		tags, _ := r.Tags.(string)
-		t, err := cachedTicketRowToModel(r.ID, r.Summary, r.Reporter, r.Status,
-			r.StatusCategory, r.Priority, r.Type, r.CreatedAt, r.UpdatedAt,
-			r.Markdown, tags)
+		t, err := cachedTicketRowToModel(
+			r.ID,
+			r.Summary,
+			r.Reporter,
+			r.Status,
+			r.StatusCategory,
+			r.Priority,
+			r.Type,
+			r.CreatedAt,
+			r.UpdatedAt,
+			r.Markdown,
+			tags,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("get epic children: %w", err)
 		}
 		t.EpicID = r.EpicID
 		result[*r.EpicID] = append(result[*r.EpicID], t)
 	}
+
 	return result, nil
 }
 

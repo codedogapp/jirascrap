@@ -57,6 +57,7 @@ func (s *Session) Exists() (bool, error) {
 	if err == nil {
 		return true, nil
 	}
+
 	// tmux returns exit code 1 when session doesn't exist — expected
 	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && exitErr.ExitCode() == 1 {
 		return false, nil
@@ -112,6 +113,7 @@ func (s *Session) NewWindow(name, dir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	out, err := output(
 		"new-window",
 		"-t",
@@ -124,9 +126,11 @@ func (s *Session) NewWindow(name, dir string) (string, error) {
 		"-F",
 		"#{window_id}",
 	)
+
 	if err != nil {
 		return "", fmt.Errorf("new-window: %w", err)
 	}
+
 	return strings.TrimSpace(out), nil
 }
 

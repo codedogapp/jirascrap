@@ -84,12 +84,16 @@ func statusColor(status string) color.Color {
 	switch {
 	case contains(s, "progress", "review", "reviewing", "development", "testing", "active"):
 		return blue
+
 	case contains(s, "done", "closed", "resolved", "complete", "finished", "released", "deployed"):
 		return green
+
 	case contains(s, "block", "impediment", "on hold", "waiting", "rejected", "cancelled"):
 		return red
+
 	case contains(s, "todo", "to do", "backlog", "new", "open", "planned"):
 		return grey
+
 	default:
 		return grey
 	}
