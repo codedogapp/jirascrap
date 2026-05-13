@@ -16,6 +16,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Generate schema
+        run: go run ./cmd/genschema
+
+      - name: Generate
+        run: go tool sqlc generate
+
       - name: Check formatting
         run: |
           if [ -n "$(gofmt -l .)" ]; then

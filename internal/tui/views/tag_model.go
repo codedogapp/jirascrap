@@ -76,11 +76,13 @@ func (m *TagModel) Update(msg tea.KeyPressMsg) tea.Cmd {
 			m.completeSuggestion()
 		}
 		return nil
+
 	case key.Matches(msg, keymaps.DefaultTagKeyMap.NextSuggestion):
 		if len(m.suggestions) > 0 && m.selectedIdx < len(m.suggestions)-1 {
 			m.selectedIdx++
 		}
 		return nil
+
 	case key.Matches(msg, keymaps.DefaultTagKeyMap.PrevSuggestion):
 		if len(m.suggestions) > 0 && m.selectedIdx > 0 {
 			m.selectedIdx--

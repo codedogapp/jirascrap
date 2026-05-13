@@ -30,3 +30,7 @@ e2e/mock-server
 .DS_Store
 
 .idea
+
+# sqlc generated code (regenerated via `mise run generate`)
+internal/store/sqlcdb/
+internal/store/schema.sql

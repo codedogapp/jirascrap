@@ -1,8 +1,11 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/codedogapp/jirascrap/internal/store/sqlcdb"
 )
 
 // TagStore manages ticket tags/labels.
@@ -27,21 +30,16 @@ func (s *SqliteTagStore) SaveTags(id string, tags []string) error {
 	}
 	defer tx.Rollback()
 
-	if _, err = tx.Exec(`DELETE FROM issue_tags WHERE id = ?`, id); err != nil {
+	q := sqlcdb.New(tx)
+	ctx := context.Background()
+
+	if err = q.DeleteTagsByID(ctx, id); err != nil {
 		return fmt.Errorf("save tags for %s: delete old: %w", id, err)
 	}
 
-	if len(tags) > 0 {
-		stmt, err := tx.Prepare(`INSERT INTO issue_tags (id, tag) VALUES (?, ?)`)
-		if err != nil {
-			return fmt.Errorf("save tags for %s: prepare: %w", id, err)
-		}
-		defer stmt.Close()
-
-		for _, tag := range tags {
-			if _, err = stmt.Exec(id, tag); err != nil {
-				return fmt.Errorf("save tag %q for %s: %w", tag, id, err)
-			}
+	for _, tag := range tags {
+		if err = q.InsertTag(ctx, sqlcdb.InsertTagParams{ID: id, Tag: tag}); err != nil {
+			return fmt.Errorf("save tag %q for %s: %w", tag, id, err)
 		}
 	}
 
@@ -52,23 +50,10 @@ func (s *SqliteTagStore) SaveTags(id string, tags []string) error {
 }
 
 func (s *SqliteTagStore) GetUniqueTags() ([]string, error) {
-	rows, err := s.db.Query(`SELECT DISTINCT tag FROM issue_tags ORDER BY tag ASC`)
+	q := sqlcdb.New(s.db)
+	tags, err := q.GetUniqueTags(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("get unique tags: %w", err)
-	}
-	defer rows.Close()
-
-	var tags []string
-	for rows.Next() {
-		var tag string
-		if err := rows.Scan(&tag); err != nil {
-			return nil, fmt.Errorf("get unique tags: scan: %w", err)
-		}
-		tags = append(tags, tag)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("get unique tags: rows: %w", err)
 	}
 
 	return tags, nil

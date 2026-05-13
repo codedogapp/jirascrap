@@ -47,8 +47,10 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body any, ac
 		switch action {
 		case responseOK:
 			return respBody.body, nil
+
 		case responseFail:
 			return nil, fmt.Errorf("jira api error [%d]: %s", respBody.statusCode, string(respBody.body))
+
 		case responseRetry:
 			lastErr = fmt.Errorf("jira api error [%d]: %s", respBody.statusCode, string(respBody.body))
 			if wait > 0 {
@@ -113,14 +115,17 @@ func classifyResponse(resp *rawResponse, accepted []int) (responseAction, time.D
 	if resp.statusCode == http.StatusTooManyRequests {
 		return responseRetry, parseRetryAfter(resp.headers)
 	}
+
 	if resp.statusCode >= 500 {
 		return responseRetry, 0
 	}
+
 	for _, s := range accepted {
 		if resp.statusCode == s {
 			return responseOK, 0
 		}
 	}
+
 	return responseFail, 0
 }
 
@@ -139,10 +144,12 @@ func marshalBody(body any) ([]byte, error) {
 	if body == nil {
 		return nil, nil
 	}
+
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
+
 	return b, nil
 }
 
@@ -160,6 +167,7 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+
 	case <-t.C:
 		return nil
 	}

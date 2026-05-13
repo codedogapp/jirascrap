@@ -1,11 +1,14 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/codedogapp/jirascrap/internal/model"
+	"github.com/codedogapp/jirascrap/internal/store/sqlcdb"
 )
 
 // TicketCache manages the local ticket cache.
@@ -32,7 +35,10 @@ func (s *SqliteTicketCache) CacheTickets(tickets []model.Ticket) error {
 	}
 	defer tx.Rollback()
 
-	if _, err = tx.Exec(`DELETE FROM tickets WHERE epic_id IS NULL`); err != nil {
+	q := sqlcdb.New(tx)
+	ctx := context.Background()
+
+	if err = q.DeleteTopLevelTickets(ctx); err != nil {
 		return fmt.Errorf("cache tickets: clear old: %w", err)
 	}
 
@@ -40,27 +46,8 @@ func (s *SqliteTicketCache) CacheTickets(tickets []model.Ticket) error {
 		return tx.Commit()
 	}
 
-	stmt, err := tx.Prepare(`
-		INSERT OR REPLACE INTO tickets (
-			id, 
-		 	summary,
-			reporter, 
-			status,
-			status_category,
-			priority,
-			type,
-			created_at,
-			updated_at,
-			markdown
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return fmt.Errorf("cache tickets: prepare: %w", err)
-	}
-	defer stmt.Close()
-
 	for _, t := range tickets {
-		if _, err := stmt.Exec(ticketInsertValues(t)...); err != nil {
+		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, nil)); err != nil {
 			return fmt.Errorf("cache ticket %s: %w", t.ID, err)
 		}
 	}
@@ -71,37 +58,34 @@ func (s *SqliteTicketCache) CacheTickets(tickets []model.Ticket) error {
 	return nil
 }
 
-// GetCachedTickets returns top-level tickets and epics, with tags pre-joined.
 func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
-	rows, err := s.db.Query(`
-		SELECT t.id, t.summary, t.reporter, t.status, t.status_category,
-		       t.priority, t.type, t.created_at, t.updated_at, t.markdown,
-		       GROUP_CONCAT(it.tag) AS tags
-		FROM tickets t
-		LEFT JOIN issue_tags it ON t.id = it.id
-		WHERE t.epic_id IS NULL
-		   OR LOWER(t.type) = 'epic'
-		GROUP BY t.id
-		ORDER BY t.updated_at DESC
-	`)
+	q := sqlcdb.New(s.db)
+	rows, err := q.GetCachedTickets(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("get cached tickets: %w", err)
 	}
-	defer rows.Close()
 
-	var tickets []model.Ticket
-	for rows.Next() {
-		t, err := scanTicketWithTags(rows)
+	tickets := make([]model.Ticket, 0, len(rows))
+	for _, r := range rows {
+		tags, _ := r.Tags.(string)
+		t, err := cachedTicketRowToModel(
+			r.ID,
+			r.Summary,
+			r.Reporter,
+			r.Status,
+			r.StatusCategory,
+			r.Priority,
+			r.Type,
+			r.CreatedAt,
+			r.UpdatedAt,
+			r.Markdown,
+			tags,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("get cached tickets: scan: %w", err)
+			return nil, fmt.Errorf("get cached tickets: %w", err)
 		}
 		tickets = append(tickets, t)
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("get cached tickets: rows: %w", err)
-	}
-
 	return tickets, nil
 }
 
@@ -112,36 +96,16 @@ func (s *SqliteTicketCache) CacheEpicChildren(epicKey string, tickets []model.Ti
 	}
 	defer tx.Rollback()
 
-	if _, err = tx.Exec(`DELETE FROM tickets WHERE epic_id = ?`, epicKey); err != nil {
+	q := sqlcdb.New(tx)
+	ctx := context.Background()
+
+	if err = q.DeleteEpicChildren(ctx, &epicKey); err != nil {
 		return fmt.Errorf("cache epic %s children: clear old: %w", epicKey, err)
 	}
 
-	if len(tickets) > 0 {
-		stmt, err := tx.Prepare(`
-			INSERT OR REPLACE INTO tickets (
-				id, 
-			    summary,
-			   	reporter,
-			   	status,
-			   	status_category,
-				priority, 
-				type, 
-				created_at, 
-			   	updated_at,
-		   		markdown, 
-			   	epic_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`)
-		if err != nil {
-			return fmt.Errorf("cache epic %s children: prepare: %w", epicKey, err)
-		}
-		defer stmt.Close()
-
-		for _, t := range tickets {
-			args := append(ticketInsertValues(t), epicKey)
-			if _, err := stmt.Exec(args...); err != nil {
-				return fmt.Errorf("cache epic %s child %s: %w", epicKey, t.ID, err)
-			}
+	for _, t := range tickets {
+		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, &epicKey)); err != nil {
+			return fmt.Errorf("cache epic %s child %s: %w", epicKey, t.ID, err)
 		}
 	}
 
@@ -152,71 +116,85 @@ func (s *SqliteTicketCache) CacheEpicChildren(epicKey string, tickets []model.Ti
 }
 
 func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticket, error) {
-	rows, err := s.db.Query(`
-		SELECT t.epic_id, 
-		       t.id,
-		       t.summary,
-		       t.reporter,
-		       t.status,
-		       t.status_category,
-		       t.priority,
-		       t.type,
-		       t.created_at,
-		       t.updated_at,
-		       t.markdown,
-		       GROUP_CONCAT(it.tag) AS tags
-		FROM tickets t
-		LEFT JOIN issue_tags it ON t.id = it.id
-		WHERE t.epic_id IS NOT NULL
-		GROUP BY t.id
-		ORDER BY t.epic_id, t.updated_at DESC
-	`)
+	q := sqlcdb.New(s.db)
+	rows, err := q.GetAllEpicChildren(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("get epic children: %w", err)
 	}
-	defer rows.Close()
 
 	result := make(map[string][]model.Ticket)
-	for rows.Next() {
-		var epicID string
-		var t model.Ticket
-		var createdAt, updatedAt string
-		var tags sql.NullString
-		if err := rows.Scan(
-			&epicID,
-			&t.ID,
-			&t.Summary,
-			&t.Reporter,
-			&t.Status,
-			&t.StatusCategory,
-			&t.Priority,
-			&t.Type,
-			&createdAt,
-			&updatedAt,
-			&t.Markdown,
-			&tags,
-		); err != nil {
-			return nil, fmt.Errorf("get epic children: scan: %w", err)
+	for _, r := range rows {
+		tags, _ := r.Tags.(string)
+		t, err := cachedTicketRowToModel(
+			r.ID,
+			r.Summary,
+			r.Reporter,
+			r.Status,
+			r.StatusCategory,
+			r.Priority,
+			r.Type,
+			r.CreatedAt,
+			r.UpdatedAt,
+			r.Markdown,
+			tags,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("get epic children: %w", err)
 		}
-		t.EpicID = &epicID
-		var err2 error
-		t.CreatedAt, err2 = parseTime(createdAt)
-		if err2 != nil {
-			return nil, fmt.Errorf("get epic children: %w", err2)
-		}
-		t.UpdatedAt, err2 = parseTime(updatedAt)
-		if err2 != nil {
-			return nil, fmt.Errorf("get epic children: %w", err2)
-		}
-		if tags.Valid && tags.String != "" {
-			t.Tags = strings.Split(tags.String, ",")
-		}
-		result[epicID] = append(result[epicID], t)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("get epic children: rows: %w", err)
+		t.EpicID = r.EpicID
+		result[*r.EpicID] = append(result[*r.EpicID], t)
 	}
 
 	return result, nil
+}
+
+func ticketToUpsertParams(t model.Ticket, epicID *string) sqlcdb.UpsertTicketParams {
+	typ := t.Type
+	if typ == "" {
+		typ = "task"
+	}
+	return sqlcdb.UpsertTicketParams{
+		ID:             t.ID,
+		Summary:        t.Summary,
+		Reporter:       t.Reporter,
+		Status:         t.Status,
+		StatusCategory: t.StatusCategory,
+		Priority:       t.Priority,
+		Type:           typ,
+		CreatedAt:      t.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
+		Markdown:       t.Markdown,
+		EpicID:         epicID,
+	}
+}
+
+func cachedTicketRowToModel(
+	id, summary, reporter, status, statusCategory, priority, typ,
+	createdAt, updatedAt, markdown, tags string,
+) (model.Ticket, error) {
+	t := model.Ticket{
+		ID:             id,
+		Summary:        summary,
+		Reporter:       reporter,
+		Status:         status,
+		StatusCategory: statusCategory,
+		Priority:       priority,
+		Type:           typ,
+		Markdown:       markdown,
+	}
+
+	var err error
+	t.CreatedAt, err = parseTime(createdAt)
+	if err != nil {
+		return model.Ticket{}, err
+	}
+	t.UpdatedAt, err = parseTime(updatedAt)
+	if err != nil {
+		return model.Ticket{}, err
+	}
+
+	if tags != "" {
+		t.Tags = strings.Split(tags, ",")
+	}
+	return t, nil
 }

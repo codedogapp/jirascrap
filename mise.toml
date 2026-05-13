@@ -1,12 +1,23 @@
 [tools]
 go = "latest"
 
+[tasks.schema]
+run = "go run ./cmd/genschema"
+description = "Generate schema.sql from goose migrations"
+
+[tasks.generate]
+run = "go tool sqlc generate"
+depends = ["schema"]
+description = "Run sqlc codegen"
+
 [tasks.build]
 run = "go build -o jirascrap.out ."
+depends = ["generate"]
 description = "Build the jirascrap binary"
 
 [tasks.run]
 run = "go run ."
+depends = ["generate"]
 description = "Run without building"
 
 [tasks.clean]
