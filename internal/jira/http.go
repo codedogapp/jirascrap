@@ -91,7 +91,7 @@ func (c *Client) executeRequest(ctx context.Context, method, url string, jsonByt
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}

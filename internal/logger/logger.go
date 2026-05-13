@@ -129,7 +129,7 @@ func (l *Logger) Logs() []LogEntry {
 // It also prunes old log files beyond maxLogFiles. Returns the file (caller
 // must close) and the path for display purposes.
 func OpenSessionLog(dir string) (*os.File, string, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, "", fmt.Errorf("create log dir: %w", err)
 	}
 
@@ -138,7 +138,7 @@ func OpenSessionLog(dir string) (*os.File, string, error) {
 	name := fmt.Sprintf("session-%s.log", time.Now().Format("20060102-150405"))
 	path := filepath.Join(dir, name)
 
-	f, err := os.Create(path)
+	f, err := os.Create(path) // #nosec G304 -- path is constructed from trusted dir + timestamp
 	if err != nil {
 		return nil, "", fmt.Errorf("create log file: %w", err)
 	}
@@ -165,6 +165,6 @@ func pruneOldLogs(dir string) {
 
 	sort.Strings(logFiles)
 	for _, name := range logFiles[:len(logFiles)-maxLogFiles] {
-		os.Remove(filepath.Join(dir, name))
+		_ = os.Remove(filepath.Join(dir, name))
 	}
 }

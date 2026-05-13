@@ -47,7 +47,7 @@ func (m *AppModel) sendToCopilotCmd(ticket model.Ticket, todos []model.Todo) tea
 		}
 
 		// Ensure tmux session
-		if err := os.MkdirAll(workspace, 0755); err != nil {
+		if err := os.MkdirAll(workspace, 0750); err != nil {
 			return copilotLaunchedMsg{ticketID: ticket.ID, err: fmt.Errorf("creating workspace: %w", err)}
 		}
 		if err := copilotSession.Ensure(workspace); err != nil {
@@ -106,14 +106,14 @@ func resolveWindow(ticketID, workspace string) (string, error) {
 
 func writePromptFile(ticket model.Ticket, todos []model.Todo) (string, error) {
 	dir := filepath.Join(os.TempDir(), "jirascrap")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return "", fmt.Errorf("creating prompt dir: %w", err)
 	}
 
 	sanitizedID := strings.ReplaceAll(strings.ToLower(ticket.ID), "/", "-")
 	path := filepath.Join(dir, fmt.Sprintf("%s.md", sanitizedID))
 
-	if err := os.WriteFile(path, []byte(buildCopilotPrompt(ticket, todos)), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(buildCopilotPrompt(ticket, todos)), 0600); err != nil {
 		return "", fmt.Errorf("writing prompt: %w", err)
 	}
 

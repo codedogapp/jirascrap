@@ -246,7 +246,7 @@ func (m *AppModel) handleOpenInBrowser(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	ticketURL := fmt.Sprintf("%s/browse/%s", domain, ticket.ID)
 
 	return true, func() tea.Msg {
-		_ = exec.Command("open", ticketURL).Start()
+		_ = exec.Command("open", ticketURL).Start() // #nosec G204 -- ticketURL is from trusted config
 		return nil
 	}
 }

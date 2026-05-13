@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type response struct {
@@ -197,7 +198,7 @@ func main() {
 
 	http.HandleFunc("/rest/api/3/search/jql", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(data)
+		_ = json.NewEncoder(w).Encode(data)
 	})
 
 	// GET: return available transitions; POST: execute transition
@@ -227,7 +228,7 @@ func main() {
 				transitions = []transition{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
+			_ = json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
 
 		case "POST":
 			var body struct {
@@ -235,7 +236,7 @@ func main() {
 					ID string `json:"id"`
 				} `json:"transition"`
 			}
-			json.NewDecoder(r.Body).Decode(&body)
+			_ = json.NewDecoder(r.Body).Decode(&body)
 
 			// Find the transition and apply it
 			statusCat := iss.Fields.Status.StatusCategory.Name
@@ -254,7 +255,11 @@ func main() {
 	})
 
 	fmt.Fprintf(os.Stderr, "Mock Jira server listening on :%s\n", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	srv := &http.Server{
+		Addr:              ":" + port,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

@@ -145,11 +145,11 @@ func (s *Session) WindowCommand(windowID string) (string, error) {
 }
 
 func run(args ...string) error {
-	return exec.Command("tmux", args...).Run()
+	return exec.Command("tmux", args...).Run() // #nosec G204 -- args are hardcoded tmux subcommands
 }
 
 func output(args ...string) (string, error) {
-	out, err := exec.Command("tmux", args...).Output()
+	out, err := exec.Command("tmux", args...).Output() // #nosec G204 -- args are hardcoded tmux subcommands
 	return string(out), err
 }
 
