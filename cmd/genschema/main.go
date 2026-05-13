@@ -60,7 +60,7 @@ func main() {
 	}
 
 	out := header + strings.Join(stmts, "\n")
-	if err := os.WriteFile("internal/store/schema.sql", []byte(out), 0644); err != nil {
+	if err := os.WriteFile("internal/store/schema.sql", []byte(out), 0600); err != nil {
 		fatal("write: %v", err)
 	}
 	fmt.Println("schema.sql generated")

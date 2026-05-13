@@ -15,8 +15,7 @@ import (
 
 type ListModel struct {
 	list      list.Model
-	tickets   []model.Ticket
-	ticketIdx map[string]int
+	ticketIdx map[string]model.Ticket
 	style     lipgloss.Style
 }
 
@@ -64,9 +63,9 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 	}
 
 	return &ListModel{
-		list:    l,
-		tickets: tickets,
-		style:   style,
+		list:      l,
+		ticketIdx: buildTicketIndex(tickets),
+		style:     style,
 	}
 }
 
@@ -117,10 +116,8 @@ func (m *ListModel) View() tea.View {
 }
 
 func (m *ListModel) FindTicket(id string) (model.Ticket, bool) {
-	if idx, ok := m.ticketIdx[id]; ok && idx < len(m.tickets) {
-		return m.tickets[idx], true
-	}
-	return model.Ticket{}, false
+	t, ok := m.ticketIdx[id]
+	return t, ok
 }
 
 func (m *ListModel) Title() string {
@@ -138,15 +135,14 @@ func getItemsList(tickets []model.Ticket) []list.Item {
 
 func (m *ListModel) SetItems(tickets []model.Ticket) {
 	items := getItemsList(tickets)
-	m.tickets = tickets
 	m.ticketIdx = buildTicketIndex(tickets)
 	m.list.SetItems(items)
 }
 
-func buildTicketIndex(tickets []model.Ticket) map[string]int {
-	idx := make(map[string]int, len(tickets))
-	for i, t := range tickets {
-		idx[t.ID] = i
+func buildTicketIndex(tickets []model.Ticket) map[string]model.Ticket {
+	idx := make(map[string]model.Ticket, len(tickets))
+	for _, t := range tickets {
+		idx[t.ID] = t
 	}
 	return idx
 }
@@ -169,7 +165,7 @@ func (m *ListModel) SetTitle(title string) {
 }
 
 func (m *ListModel) HasTickets() bool {
-	return len(m.tickets) > 0
+	return len(m.ticketIdx) > 0
 }
 
 func (m *ListModel) SelectedTicket() (model.Ticket, bool) {

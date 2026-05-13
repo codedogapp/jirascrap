@@ -7,3 +7,8 @@ sql:
       go:
         package: "sqlcdb"
         out: "internal/store/sqlcdb"
+        overrides:
+          - column: "tickets.epic_id"
+            go_type:
+              type: "string"
+              pointer: true

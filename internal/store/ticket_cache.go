@@ -47,7 +47,7 @@ func (s *SqliteTicketCache) CacheTickets(tickets []model.Ticket) error {
 	}
 
 	for _, t := range tickets {
-		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t)); err != nil {
+		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, nil)); err != nil {
 			return fmt.Errorf("cache ticket %s: %w", t.ID, err)
 		}
 	}
@@ -89,12 +89,12 @@ func (s *SqliteTicketCache) CacheEpicChildren(epicKey string, tickets []model.Ti
 	q := sqlcdb.New(tx)
 	ctx := context.Background()
 
-	if err = q.DeleteEpicChildren(ctx, sql.NullString{String: epicKey, Valid: true}); err != nil {
+	if err = q.DeleteEpicChildren(ctx, &epicKey); err != nil {
 		return fmt.Errorf("cache epic %s children: clear old: %w", epicKey, err)
 	}
 
 	for _, t := range tickets {
-		if err := q.UpsertTicketWithEpic(ctx, ticketToUpsertWithEpicParams(t, epicKey)); err != nil {
+		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, &epicKey)); err != nil {
 			return fmt.Errorf("cache epic %s child %s: %w", epicKey, t.ID, err)
 		}
 	}
@@ -114,7 +114,6 @@ func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticke
 
 	result := make(map[string][]model.Ticket)
 	for _, r := range rows {
-		epicID := r.EpicID.String
 		tags, _ := r.Tags.(string)
 		t, err := cachedTicketRowToModel(r.ID, r.Summary, r.Reporter, r.Status,
 			r.StatusCategory, r.Priority, r.Type, r.CreatedAt, r.UpdatedAt,
@@ -122,13 +121,13 @@ func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticke
 		if err != nil {
 			return nil, fmt.Errorf("get epic children: %w", err)
 		}
-		t.EpicID = &epicID
-		result[epicID] = append(result[epicID], t)
+		t.EpicID = r.EpicID
+		result[*r.EpicID] = append(result[*r.EpicID], t)
 	}
 	return result, nil
 }
 
-func ticketToUpsertParams(t model.Ticket) sqlcdb.UpsertTicketParams {
+func ticketToUpsertParams(t model.Ticket, epicID *string) sqlcdb.UpsertTicketParams {
 	typ := t.Type
 	if typ == "" {
 		typ = "task"
@@ -144,26 +143,7 @@ func ticketToUpsertParams(t model.Ticket) sqlcdb.UpsertTicketParams {
 		CreatedAt:      t.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
 		Markdown:       t.Markdown,
-	}
-}
-
-func ticketToUpsertWithEpicParams(t model.Ticket, epicKey string) sqlcdb.UpsertTicketWithEpicParams {
-	typ := t.Type
-	if typ == "" {
-		typ = "task"
-	}
-	return sqlcdb.UpsertTicketWithEpicParams{
-		ID:             t.ID,
-		Summary:        t.Summary,
-		Reporter:       t.Reporter,
-		Status:         t.Status,
-		StatusCategory: t.StatusCategory,
-		Priority:       t.Priority,
-		Type:           typ,
-		CreatedAt:      t.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
-		Markdown:       t.Markdown,
-		EpicID:         sql.NullString{String: epicKey, Valid: true},
+		EpicID:         epicID,
 	}
 }
 

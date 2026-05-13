@@ -4,12 +4,6 @@ DELETE FROM tickets WHERE epic_id IS NULL;
 -- name: UpsertTicket :exec
 INSERT OR REPLACE INTO tickets (
   id, summary, reporter, status, status_category,
-  priority, type, created_at, updated_at, markdown
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-
--- name: UpsertTicketWithEpic :exec
-INSERT OR REPLACE INTO tickets (
-  id, summary, reporter, status, status_category,
   priority, type, created_at, updated_at, markdown, epic_id
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
