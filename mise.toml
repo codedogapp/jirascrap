@@ -1,12 +1,19 @@
 [tools]
 go = "latest"
+"go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "latest"
+
+[tasks.generate]
+run = "sqlc generate"
+description = "Run sqlc codegen"
 
 [tasks.build]
 run = "go build -o jirascrap.out ."
+depends = ["generate"]
 description = "Build the jirascrap binary"
 
 [tasks.run]
 run = "go run ."
+depends = ["generate"]
 description = "Run without building"
 
 [tasks.clean]
