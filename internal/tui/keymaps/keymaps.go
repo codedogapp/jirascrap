@@ -84,8 +84,8 @@ func newKeyMap() *KeyMap {
 		),
 
 		GoHome: key.NewBinding(
-			key.WithKeys("h"),
-			key.WithHelp("h", "home"),
+			key.WithKeys("H"),
+			key.WithHelp("H", "home"),
 		),
 
 		Select: key.NewBinding(
