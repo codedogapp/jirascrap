@@ -14,6 +14,19 @@ import (
 
 const apiTimeout = 30 * time.Second
 
+func (m *AppModel) updateSyncMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case cachedTicketsLoadedMsg:
+		return m.handleCachedTicketsLoaded(msg)
+	case syncCompleteMsg:
+		return m.handleSyncComplete(msg)
+	case syncErrorMsg:
+		return m.handleSyncError(msg)
+	default:
+		return m, nil
+	}
+}
+
 func (m *AppModel) loadCachedTickets() tea.Cmd {
 	return func() tea.Msg {
 		epicChildren, err := m.ticketCache.GetAllCachedEpicChildren()

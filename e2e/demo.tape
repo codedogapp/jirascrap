@@ -41,6 +41,18 @@ Down
 Down
 Sleep 1s
 
+# --- Add a comment ---
+Type "a"
+Sleep 1s
+Type "@Alice"
+Sleep 1s
+Tab
+Sleep 1s
+Type "Looking good! "
+Sleep 500ms
+Enter
+Sleep 2s
+
 # --- Tag the ticket ---
 Type "t"
 Sleep 1s

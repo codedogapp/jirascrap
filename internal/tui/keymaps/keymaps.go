@@ -20,6 +20,7 @@ type KeyMap struct {
 	ToggleHelp     key.Binding
 	OpenInBrowser  key.Binding
 	SendToCopilot  key.Binding
+	AddComment     key.Binding
 	Viewport       viewport.KeyMap
 	fullHelpHeight int
 }
@@ -50,6 +51,7 @@ func detectConflicts(km *KeyMap) []string {
 		{"ToggleHelp", km.ToggleHelp},
 		{"OpenInBrowser", km.OpenInBrowser},
 		{"SendToCopilot", km.SendToCopilot},
+		{"AddComment", km.AddComment},
 	}
 
 	seen := make(map[string]string) // key → first binding name
@@ -128,6 +130,11 @@ func newKeyMap() *KeyMap {
 			key.WithHelp("c", "copilot"),
 		),
 
+		AddComment: key.NewBinding(
+			key.WithKeys("a"),
+			key.WithHelp("a", "comment"),
+		),
+
 		Viewport: viewport.DefaultKeyMap(),
 	}
 	k.fullHelpHeight = k.computeFullHelpHeight()
@@ -150,7 +157,7 @@ func (k *KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Viewport.PageUp, k.Viewport.Up},
 		{k.Viewport.PageDown, k.Viewport.Down},
-		{k.ToggleTagging, k.ToggleTodo, k.ToggleStatus, k.OpenInBrowser, k.SendToCopilot},
+		{k.ToggleTagging, k.ToggleTodo, k.ToggleStatus, k.AddComment, k.OpenInBrowser, k.SendToCopilot},
 		{k.GoBack, k.GoHome, k.Quit, k.Refresh},
 	}
 }
@@ -161,13 +168,13 @@ func (k *KeyMap) GetFullHelpHeight() int {
 
 // computeFullHelpHeight returns full help height relative to short help
 func (k *KeyMap) computeFullHelpHeight() int {
-	max := 0
+	maxHeight := 0
 	for _, col := range k.FullHelp() {
-		if len(col) > max {
-			max = len(col)
+		if len(col) > maxHeight {
+			maxHeight = len(col)
 		}
 	}
-	return max - 1
+	return maxHeight - 1
 }
 
 type TagKeyMap struct {

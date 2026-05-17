@@ -10,6 +10,10 @@ import (
 const (
 	adfBulletList  = "bulletList"
 	adfOrderedList = "orderedList"
+	adfDoc         = "doc"
+	adfParagraph   = "paragraph"
+	adfText        = "text"
+	adfMention     = "mention"
 )
 
 // ADFToMarkdown converts an ADF document to Markdown text
@@ -171,7 +175,7 @@ func inlineToMarkdown(content []any) string {
 			marks, _ := inline["marks"].([]any)
 			parts = append(parts, applyMarksMD(text, marks))
 
-		case "mention":
+		case adfMention:
 			if attrs, ok := inline["attrs"].(map[string]any); ok {
 				displayName, _ := attrs["text"].(string)
 				accountID, _ := attrs["id"].(string)
@@ -415,7 +419,7 @@ func markdownToADF(md string) any {
 	}
 
 	return map[string]any{
-		"type":    "doc",
+		"type":    adfDoc,
 		"version": float64(1),
 		"content": blocks,
 	}
@@ -490,7 +494,7 @@ func parseParagraph(lines []string, i *int) any {
 	}
 	text := strings.Join(paraLines, "\n")
 	return map[string]any{
-		"type":    "paragraph",
+		"type":    adfParagraph,
 		"content": parseInline(text),
 	}
 }
@@ -542,7 +546,7 @@ type inlineRule struct {
 var inlineRules = []inlineRule{
 	{mentionRe, func(_ string, loc []int, sub []string) (int, int, any, bool) {
 		return loc[0], loc[1], map[string]any{
-			"type":  "mention",
+			"type":  adfMention,
 			"attrs": map[string]any{"text": "@" + sub[1], "id": sub[2]},
 		}, true
 	}},

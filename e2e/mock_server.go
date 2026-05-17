@@ -206,6 +206,21 @@ var commentsByIssue = map[string][]comment{
 	},
 }
 
+type userEntry struct {
+	AccountID   string `json:"accountId"`
+	DisplayName string `json:"displayName"`
+}
+
+var mockUsers = []userEntry{
+	{AccountID: "user-001", DisplayName: "Alice Chen"},
+	{AccountID: "user-002", DisplayName: "Bob Martinez"},
+	{AccountID: "user-003", DisplayName: "Carol Wu"},
+	{AccountID: "user-004", DisplayName: "Dave Kim"},
+	{AccountID: "user-005", DisplayName: "Eve Johnson"},
+}
+
+var nextCommentID = 20000
+
 // Per-issue transitions based on current status category.
 var transitionsByStatus = map[string][]transition{
 	"In Progress": {
@@ -286,15 +301,37 @@ func main() {
 
 		switch parts[1] {
 		case "comment":
-			comments := commentsByIssue[issueKey]
-			if comments == nil {
-				comments = []comment{}
+			switch r.Method {
+			case "GET":
+				comments := commentsByIssue[issueKey]
+				if comments == nil {
+					comments = []comment{}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(commentsResponse{
+					Total:    len(comments),
+					Comments: comments,
+				})
+
+			case "POST":
+				var body struct {
+					Body any `json:"body"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+
+				newComment := comment{
+					ID:      fmt.Sprintf("%d", nextCommentID),
+					Author:  named{DisplayName: "Demo User"},
+					Created: time.Now().Format("2006-01-02T15:04:05.000-0700"),
+					Body:    body.Body,
+				}
+				nextCommentID++
+				commentsByIssue[issueKey] = append(commentsByIssue[issueKey], newComment)
+				w.WriteHeader(http.StatusCreated)
+
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(commentsResponse{
-				Total:    len(comments),
-				Comments: comments,
-			})
 
 		case "transitions":
 			switch r.Method {
@@ -332,6 +369,21 @@ func main() {
 		default:
 			http.NotFound(w, r)
 		}
+	})
+
+	http.HandleFunc("/rest/api/3/user/search", func(w http.ResponseWriter, r *http.Request) {
+		query := strings.ToLower(r.URL.Query().Get("query"))
+		var results []userEntry
+		for _, u := range mockUsers {
+			if strings.Contains(strings.ToLower(u.DisplayName), query) {
+				results = append(results, u)
+			}
+		}
+		if results == nil {
+			results = []userEntry{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(results)
 	})
 
 	fmt.Fprintf(os.Stderr, "Mock Jira server listening on :%s\n", port)

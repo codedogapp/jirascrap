@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"time"
 
 	"github.com/codedogapp/jirascrap/internal/config"
@@ -32,6 +33,8 @@ type TicketClient interface {
 	FetchTransitions(ctx context.Context, issueKey string) ([]Transition, error)
 	DoTransition(ctx context.Context, issueKey string, transitionID string) error
 	FetchComments(ctx context.Context, issueKey string, maxResults int) ([]model.Comment, int, error)
+	PostComment(ctx context.Context, issueKey string, body any) error
+	SearchUsers(ctx context.Context, query string) ([]model.User, error)
 }
 
 // Client is the Jira REST API v3 client.
@@ -179,6 +182,36 @@ func (c *Client) FetchComments(ctx context.Context, issueKey string, maxResults 
 	}
 
 	return comments, result.Total, nil
+}
+
+func (c *Client) PostComment(ctx context.Context, issueKey string, body any) error {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s/comment", c.domain, issueKey)
+	_, err := c.doRequest(ctx, "POST", url, commentPostRequest{Body: body}, http.StatusCreated)
+	return err
+}
+
+func (c *Client) SearchUsers(ctx context.Context, query string) ([]model.User, error) {
+	url := fmt.Sprintf("%s/rest/api/3/user/search?query=%s&maxResults=5", c.domain, neturl.QueryEscape(query))
+
+	respBody, err := c.doRequest(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []userSearchEntry
+	if err := json.Unmarshal(respBody, &entries); err != nil {
+		return nil, fmt.Errorf("failed to decode user search: %w", err)
+	}
+
+	users := make([]model.User, 0, len(entries))
+	for _, e := range entries {
+		users = append(users, model.User{
+			AccountID:   e.AccountID,
+			DisplayName: e.DisplayName,
+		})
+	}
+
+	return users, nil
 }
 
 func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error) {

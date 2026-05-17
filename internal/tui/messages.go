@@ -69,3 +69,15 @@ type commentsErrorMsg struct {
 	ticketID string
 	err      error
 }
+
+type commentPostSuccessMsg struct {
+	ticketID string
+}
+
+type commentPostErrorMsg struct {
+	err error
+}
+
+type userSearchResultMsg struct {
+	users []model.User
+}

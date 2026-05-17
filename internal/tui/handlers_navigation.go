@@ -14,6 +14,23 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+func (m *AppModel) updateNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case views.SelectTicketMsg:
+		return m.handleSelectTicket(msg)
+	case views.GoToListMsg:
+		return m.handleGoToList(msg)
+	case epicChildrenLoadedMsg:
+		return m.handleEpicChildrenLoaded(msg)
+	case epicChildrenErrorMsg:
+		return m.handleError(views.ErrMsg{Err: msg.err})
+	case copilotLaunchedMsg:
+		return m.handleCopilotLaunched(msg)
+	default:
+		return m, nil
+	}
+}
+
 func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.list.SetSize(msg.Width, msg.Height)
 
@@ -249,36 +266,4 @@ func (m *AppModel) handleOpenInBrowser(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		_ = exec.Command("open", ticketURL).Start() // #nosec G204 -- ticketURL is from trusted config
 		return nil
 	}
-}
-
-const maxComments = 20
-
-func (m *AppModel) fetchCommentsCmd(ticketID string) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
-		defer cancel()
-		comments, total, err := m.jiraClient.FetchComments(ctx, ticketID, maxComments)
-		if err != nil {
-			return commentsErrorMsg{ticketID: ticketID, err: err}
-		}
-		return commentsLoadedMsg{ticketID: ticketID, comments: comments, total: total}
-	}
-}
-
-func (m *AppModel) handleCommentsLoaded(msg commentsLoadedMsg) (tea.Model, tea.Cmd) {
-	dm, ok := m.activeDetailModel()
-	if !ok || dm.Ticket().ID != msg.ticketID {
-		return m, nil
-	}
-	dm.SetComments(msg.comments, msg.total)
-	return m, nil
-}
-
-func (m *AppModel) handleCommentsError(msg commentsErrorMsg) (tea.Model, tea.Cmd) {
-	dm, ok := m.activeDetailModel()
-	if !ok || dm.Ticket().ID != msg.ticketID {
-		return m, nil
-	}
-	dm.SetCommentsError(msg.err)
-	return m, nil
 }

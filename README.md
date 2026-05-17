@@ -47,6 +47,7 @@ jirascrap
 | `esc` | Go back / close popup |
 | `t` | Tag current ticket |
 | `n` | Open todo list |
+| `a` | Add comment (in detail view) |
 | `s` | Change ticket status |
 | `r` | Refresh tickets from Jira |
 | `o` | Open ticket in browser |

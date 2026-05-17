@@ -104,6 +104,15 @@ type commentAuthor struct {
 	DisplayName string `json:"displayName"`
 }
 
+type commentPostRequest struct {
+	Body any `json:"body"`
+}
+
+type userSearchEntry struct {
+	AccountID   string `json:"accountId"`
+	DisplayName string `json:"displayName"`
+}
+
 type jiraTime struct {
 	time.Time
 }

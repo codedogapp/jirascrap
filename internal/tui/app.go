@@ -93,66 +93,46 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 
-	case cachedTicketsLoadedMsg:
-		return m.handleCachedTicketsLoaded(msg)
+	case tea.KeyPressMsg:
+		return m.handleKeyPress(msg)
 
-	case syncCompleteMsg:
-		return m.handleSyncComplete(msg)
+	case cachedTicketsLoadedMsg,
+		syncCompleteMsg,
+		syncErrorMsg:
+		return m.updateSyncMsg(msg)
 
-	case syncErrorMsg:
-		return m.handleSyncError(msg)
+	case views.SelectTicketMsg,
+		views.GoToListMsg,
+		epicChildrenLoadedMsg,
+		epicChildrenErrorMsg,
+		copilotLaunchedMsg:
+		return m.updateNavigationMsg(msg)
+
+	case views.TagsFilledMsg,
+		views.TodosChangedMsg,
+		tagSavedMsg,
+		todoSavedMsg:
+		return m.updatePopupMsg(msg)
+
+	case transitionsLoadedMsg,
+		transitionsErrorMsg,
+		views.StatusTransitionMsg,
+		statusTransitionCompleteMsg,
+		statusTransitionErrorMsg:
+		return m.updateStatusMsg(msg)
+
+	case commentsLoadedMsg,
+		commentsErrorMsg,
+		views.CommentSubmitMsg,
+		views.CommentCancelMsg,
+		commentPostSuccessMsg,
+		commentPostErrorMsg,
+		views.UserSearchRequestMsg,
+		userSearchResultMsg:
+		return m.updateCommentMsg(msg)
 
 	case views.ErrMsg:
 		return m.handleError(msg)
-
-	case views.SelectTicketMsg:
-		return m.handleSelectTicket(msg)
-
-	case epicChildrenLoadedMsg:
-		return m.handleEpicChildrenLoaded(msg)
-
-	case epicChildrenErrorMsg:
-		return m.handleError(views.ErrMsg{Err: msg.err})
-
-	case views.GoToListMsg:
-		return m.handleGoToList(msg)
-
-	case views.TagsFilledMsg:
-		return m.handleTagFilled(msg)
-
-	case views.TodosChangedMsg:
-		return m.handleTodosChanged(msg)
-
-	case tagSavedMsg:
-		return m.handleTagSaved(msg)
-
-	case todoSavedMsg:
-		return m, m.popups.toast.Show("✓ Todos saved")
-
-	case copilotLaunchedMsg:
-		return m.handleCopilotLaunched(msg)
-
-	case transitionsLoadedMsg:
-		return m.handleTransitionsLoaded(msg)
-
-	case transitionsErrorMsg:
-		m.popups.status.Hide()
-		return m.handleError(views.ErrMsg{Err: msg.err})
-
-	case views.StatusTransitionMsg:
-		return m.handleStatusTransition(msg)
-
-	case statusTransitionCompleteMsg:
-		return m.handleStatusTransitionComplete(msg)
-
-	case statusTransitionErrorMsg:
-		return m.handleError(views.ErrMsg{Err: msg.err})
-
-	case commentsLoadedMsg:
-		return m.handleCommentsLoaded(msg)
-
-	case commentsErrorMsg:
-		return m.handleCommentsError(msg)
 
 	case views.ToastTimeoutMsg:
 		if m.popups.toast.ShouldHide(msg) {
@@ -160,58 +140,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyPressMsg:
-		return m.handleKeyPress(msg)
-
 	default:
 		return m.handleOtherMsg(msg)
 	}
-}
-
-func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if cmd := m.handleQuit(msg); cmd != nil {
-		return m, cmd
-	}
-	if consumed, cmd := m.popups.RouteKeyPress(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleRefresh(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleExitEpic(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleGoHome(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleOpenInBrowser(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleToggleTag(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleToggleTodo(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleToggleStatus(msg); consumed {
-		return m, cmd
-	}
-	if consumed, cmd := m.handleSendToCopilot(msg); consumed {
-		return m, cmd
-	}
-	var cmd tea.Cmd
-	m.activeModel, cmd = m.activeModel.Update(msg)
-	return m, cmd
-}
-
-func (m *AppModel) handleOtherMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if handled, cmd := m.popups.RouteMsg(msg); handled {
-		return m, cmd
-	}
-	if mu, ok := m.activeModel.(views.MsgUpdater); ok {
-		return m, mu.UpdateMsg(msg)
-	}
-	return m, nil
 }
 
 func (m *AppModel) View() tea.View {

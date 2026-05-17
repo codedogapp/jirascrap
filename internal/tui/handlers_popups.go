@@ -13,6 +13,39 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+func (m *AppModel) updatePopupMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case views.TagsFilledMsg:
+		return m.handleTagFilled(msg)
+	case views.TodosChangedMsg:
+		return m.handleTodosChanged(msg)
+	case tagSavedMsg:
+		return m.handleTagSaved(msg)
+	case todoSavedMsg:
+		return m, m.popups.toast.Show("✓ Todos saved")
+	default:
+		return m, nil
+	}
+}
+
+func (m *AppModel) updateStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case transitionsLoadedMsg:
+		return m.handleTransitionsLoaded(msg)
+	case transitionsErrorMsg:
+		m.popups.status.Hide()
+		return m.handleError(views.ErrMsg{Err: msg.err})
+	case views.StatusTransitionMsg:
+		return m.handleStatusTransition(msg)
+	case statusTransitionCompleteMsg:
+		return m.handleStatusTransitionComplete(msg)
+	case statusTransitionErrorMsg:
+		return m.handleError(views.ErrMsg{Err: msg.err})
+	default:
+		return m, nil
+	}
+}
+
 func (m *AppModel) handleTagKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):

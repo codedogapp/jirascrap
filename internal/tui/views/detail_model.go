@@ -24,6 +24,9 @@ type DetailModel struct {
 	commentsTotal   int
 	commentsLoading bool
 	commentsError   error
+
+	commentInput *CommentInputModel
+	contentWidth int
 }
 
 type GoToListMsg struct{}
@@ -62,23 +65,33 @@ func NewDetailModel(
 		helpModel:       helpModel,
 		availableHeight: availableHeight,
 		commentsLoading: true,
+		commentInput:    NewCommentInput(contentWidth),
+		contentWidth:    contentWidth,
 	}
 }
 
 func (m *DetailModel) Update(msg tea.KeyPressMsg) (ActiveModel, tea.Cmd) {
+	if m.commentInput.Visible() {
+		var cmd tea.Cmd
+		m.commentInput, cmd = m.commentInput.handleKey(msg)
+		m.AdjustViewportHeight()
+		return m, cmd
+	}
+
 	switch {
 	case key.Matches(msg, keymaps.DefaultKeyMap.GoBack):
 		return m, func() tea.Msg {
 			return GoToListMsg{}
 		}
 
+	case key.Matches(msg, keymaps.DefaultKeyMap.AddComment):
+		cmd := m.commentInput.Show(m.ticket.ID)
+		m.AdjustViewportHeight()
+		return m, cmd
+
 	case key.Matches(msg, keymaps.DefaultKeyMap.ToggleHelp):
 		m.helpModel.ShowAll = !m.helpModel.ShowAll
-		if m.helpModel.ShowAll {
-			m.viewport.SetHeight(m.availableHeight - keymaps.DefaultKeyMap.GetFullHelpHeight())
-		} else {
-			m.viewport.SetHeight(m.availableHeight)
-		}
+		m.AdjustViewportHeight()
 		return m, nil
 
 	default:
@@ -174,6 +187,29 @@ func (m *DetailModel) SetCommentsError(err error) {
 	m.refreshContent()
 }
 
+func (m *DetailModel) CommentInput() *CommentInputModel {
+	return m.commentInput
+}
+
+func (m *DetailModel) AdjustViewportHeight() {
+	h := m.availableHeight
+	if m.helpModel.ShowAll {
+		h -= keymaps.DefaultKeyMap.GetFullHelpHeight()
+	}
+	h -= m.commentInput.Height()
+	m.viewport.SetHeight(h)
+}
+
+// UpdateMsg handles non-key messages (cursor blink, etc.) for the comment input.
+func (m *DetailModel) UpdateMsg(msg tea.Msg) tea.Cmd {
+	if !m.commentInput.Visible() {
+		return nil
+	}
+	var cmd tea.Cmd
+	m.commentInput, cmd = m.commentInput.Update(msg)
+	return cmd
+}
+
 func (m *DetailModel) refreshContent() {
 	contentWidth := m.viewport.Width()
 	markdown := getContent(m.ticket, contentWidth)
@@ -183,7 +219,12 @@ func (m *DetailModel) refreshContent() {
 
 func (m *DetailModel) View() tea.View {
 	helpView := styleHelp(m.helpModel.View(keymaps.DefaultKeyMap))
-	return tea.NewView(m.viewport.View() + "\n" + helpView)
+	content := m.viewport.View() + "\n"
+	if m.commentInput.Visible() {
+		content += m.commentInput.View() + "\n"
+	}
+	content += helpView
+	return tea.NewView(content)
 }
 
 func getContent(ticket model.Ticket, width int) string {
