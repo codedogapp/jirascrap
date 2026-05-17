@@ -19,6 +19,11 @@ type DetailModel struct {
 	viewport        viewport.Model
 	helpModel       help.Model
 	availableHeight int
+
+	comments        []model.Comment
+	commentsTotal   int
+	commentsLoading bool
+	commentsError   error
 }
 
 type GoToListMsg struct{}
@@ -46,7 +51,7 @@ func NewDetailModel(
 
 	markdown := getContent(ticket, contentWidth)
 
-	vp.SetContent(getMetaData(ticket, contentWidth) + markdown)
+	vp.SetContent(getMetaData(ticket, contentWidth) + markdown + "\n" + commentsLoadingView())
 
 	helpModel := help.New()
 	helpModel.SetWidth(contentWidth)
@@ -56,6 +61,7 @@ func NewDetailModel(
 		viewport:        vp,
 		helpModel:       helpModel,
 		availableHeight: availableHeight,
+		commentsLoading: true,
 	}
 }
 
@@ -147,13 +153,32 @@ func getMetaData(ticket model.Ticket, width int) string {
 
 func (m *DetailModel) UpdateTags(ticket model.Ticket) {
 	m.ticket = ticket
-	contentWidth := m.viewport.Width()
-	markdown := getContent(ticket, contentWidth)
-	m.viewport.SetContent(getMetaData(ticket, contentWidth) + markdown)
+	m.refreshContent()
 }
 
 func (m *DetailModel) Ticket() model.Ticket {
 	return m.ticket
+}
+
+func (m *DetailModel) SetComments(comments []model.Comment, total int) {
+	m.comments = comments
+	m.commentsTotal = total
+	m.commentsLoading = false
+	m.commentsError = nil
+	m.refreshContent()
+}
+
+func (m *DetailModel) SetCommentsError(err error) {
+	m.commentsError = err
+	m.commentsLoading = false
+	m.refreshContent()
+}
+
+func (m *DetailModel) refreshContent() {
+	contentWidth := m.viewport.Width()
+	markdown := getContent(m.ticket, contentWidth)
+	commentsSection := m.renderComments(contentWidth)
+	m.viewport.SetContent(getMetaData(m.ticket, contentWidth) + markdown + "\n" + commentsSection)
 }
 
 func (m *DetailModel) View() tea.View {
@@ -176,6 +201,78 @@ func getContent(ticket model.Ticket, width int) string {
 	}
 
 	return rendered
+}
+
+func (m *DetailModel) renderComments(width int) string {
+	if m.commentsLoading {
+		return commentsLoadingView()
+	}
+	if m.commentsError != nil {
+		return commentsErrorView(m.commentsError)
+	}
+	if len(m.comments) == 0 {
+		return commentsEmptyView(width)
+	}
+	return commentsView(m.comments, m.commentsTotal, width)
+}
+
+func commentsLoadingView() string {
+	return dimStyle.Render("Loading comments...")
+}
+
+func commentsErrorView(err error) string {
+	return dimStyle.Render(fmt.Sprintf("⚠ Failed to load comments: %v", err))
+}
+
+func commentsEmptyView(width int) string {
+	var sb strings.Builder
+	sb.WriteString(dimStyle.Render(strings.Repeat("─", width-separatorPadding)))
+	sb.WriteString("\n\n")
+	sb.WriteString(dimStyle.Render("💬 No comments"))
+	sb.WriteString("\n")
+	return sb.String()
+}
+
+func commentsView(comments []model.Comment, total int, width int) string {
+	var sb strings.Builder
+
+	sb.WriteString(dimStyle.Render(strings.Repeat("─", width-separatorPadding)))
+	sb.WriteString("\n\n")
+
+	shown := len(comments)
+	if total > shown {
+		sb.WriteString(fmt.Sprintf("💬 Comments (%d of %d)\n\n", shown, total))
+	} else {
+		sb.WriteString(fmt.Sprintf("💬 Comments (%d)\n\n", total))
+	}
+
+	renderer, _ := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dracula"),
+		glamour.WithWordWrap(width),
+	)
+
+	for i, c := range comments {
+		author := lipgloss.NewStyle().Bold(true).Render(c.Author)
+		ts := dimStyle.Render(c.CreatedAt.Format("2006-01-02 15:04"))
+		sb.WriteString(author + " · " + ts + "\n\n")
+
+		if renderer != nil && c.Markdown != "" {
+			rendered, err := renderer.Render(c.Markdown)
+			if err == nil {
+				sb.WriteString(rendered)
+			} else {
+				sb.WriteString(c.Markdown + "\n")
+			}
+		} else if c.Markdown != "" {
+			sb.WriteString(c.Markdown + "\n")
+		}
+
+		if i < len(comments)-1 {
+			sb.WriteString("\n" + dimStyle.Render("---") + "\n\n")
+		}
+	}
+
+	return sb.String()
 }
 
 // --------- Styles Helpers ---------

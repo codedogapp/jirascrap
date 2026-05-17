@@ -86,6 +86,24 @@ type transitionRef struct {
 	ID string `json:"id"`
 }
 
+// Comment API response types.
+
+type commentsResponse struct {
+	Total    int            `json:"total"`
+	Comments []commentEntry `json:"comments"`
+}
+
+type commentEntry struct {
+	ID      string        `json:"id"`
+	Author  commentAuthor `json:"author"`
+	Created jiraTime      `json:"created"`
+	Body    any           `json:"body"`
+}
+
+type commentAuthor struct {
+	DisplayName string `json:"displayName"`
+}
+
 type jiraTime struct {
 	time.Time
 }

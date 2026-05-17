@@ -47,7 +47,7 @@ func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea
 	}
 
 	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
-	return m, nil
+	return m, m.fetchCommentsCmd(msg.Ticket.ID)
 }
 
 func (m *AppModel) showEpicChildren(epicKey string, tickets []model.Ticket) (tea.Model, tea.Cmd) {
@@ -249,4 +249,36 @@ func (m *AppModel) handleOpenInBrowser(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		_ = exec.Command("open", ticketURL).Start() // #nosec G204 -- ticketURL is from trusted config
 		return nil
 	}
+}
+
+const maxComments = 20
+
+func (m *AppModel) fetchCommentsCmd(ticketID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+		defer cancel()
+		comments, total, err := m.jiraClient.FetchComments(ctx, ticketID, maxComments)
+		if err != nil {
+			return commentsErrorMsg{ticketID: ticketID, err: err}
+		}
+		return commentsLoadedMsg{ticketID: ticketID, comments: comments, total: total}
+	}
+}
+
+func (m *AppModel) handleCommentsLoaded(msg commentsLoadedMsg) (tea.Model, tea.Cmd) {
+	dm, ok := m.activeDetailModel()
+	if !ok || dm.Ticket().ID != msg.ticketID {
+		return m, nil
+	}
+	dm.SetComments(msg.comments, msg.total)
+	return m, nil
+}
+
+func (m *AppModel) handleCommentsError(msg commentsErrorMsg) (tea.Model, tea.Cmd) {
+	dm, ok := m.activeDetailModel()
+	if !ok || dm.Ticket().ID != msg.ticketID {
+		return m, nil
+	}
+	dm.SetCommentsError(msg.err)
+	return m, nil
 }

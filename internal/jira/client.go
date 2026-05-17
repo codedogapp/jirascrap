@@ -31,6 +31,7 @@ type TicketClient interface {
 	FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error)
 	FetchTransitions(ctx context.Context, issueKey string) ([]Transition, error)
 	DoTransition(ctx context.Context, issueKey string, transitionID string) error
+	FetchComments(ctx context.Context, issueKey string, maxResults int) ([]model.Comment, int, error)
 }
 
 // Client is the Jira REST API v3 client.
@@ -151,6 +152,33 @@ func (c *Client) DoTransition(ctx context.Context, issueKey string, transitionID
 		http.StatusNoContent,
 	)
 	return err
+}
+
+func (c *Client) FetchComments(ctx context.Context, issueKey string, maxResults int) ([]model.Comment, int, error) {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s/comment?orderBy=-created&maxResults=%d", c.domain, issueKey, maxResults)
+
+	respBody, err := c.doRequest(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var result commentsResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, 0, fmt.Errorf("failed to decode comments: %w", err)
+	}
+
+	comments := make([]model.Comment, 0, len(result.Comments))
+	for i := len(result.Comments) - 1; i >= 0; i-- {
+		entry := result.Comments[i]
+		comments = append(comments, model.Comment{
+			ID:        entry.ID,
+			Author:    entry.Author.DisplayName,
+			CreatedAt: entry.Created.Time,
+			Markdown:  ADFToMarkdown(entry.Body),
+		})
+	}
+
+	return comments, result.Total, nil
 }
 
 func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error) {

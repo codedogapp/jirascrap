@@ -58,3 +58,14 @@ type statusTransitionCompleteMsg struct {
 type statusTransitionErrorMsg struct {
 	err error
 }
+
+type commentsLoadedMsg struct {
+	ticketID string
+	comments []model.Comment
+	total    int
+}
+
+type commentsErrorMsg struct {
+	ticketID string
+	err      error
+}

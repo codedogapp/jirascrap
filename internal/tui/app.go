@@ -148,6 +148,12 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case statusTransitionErrorMsg:
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
+	case commentsLoadedMsg:
+		return m.handleCommentsLoaded(msg)
+
+	case commentsErrorMsg:
+		return m.handleCommentsError(msg)
+
 	case views.ToastTimeoutMsg:
 		if m.popups.toast.ShouldHide(msg) {
 			m.popups.toast.Hide()
