@@ -103,7 +103,7 @@ func Load() (*Config, error) {
 func (c *Config) Validate() error {
 	var errs []error
 
-	if !strings.HasPrefix(c.Domain, "https://") {
+	if !strings.HasPrefix(c.Domain, "https://") && !c.allowHTTP() {
 		errs = append(errs, fmt.Errorf("JIRA_BASE_URL must use HTTPS (got %q)", c.Domain))
 	}
 
@@ -115,4 +115,8 @@ func (c *Config) Validate() error {
 		return errors.Join(errs...)
 	}
 	return nil
+}
+
+func (c *Config) allowHTTP() bool {
+	return os.Getenv("JIRASCRAP_ALLOW_HTTP") == "1"
 }

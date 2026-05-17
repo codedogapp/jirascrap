@@ -78,6 +78,8 @@ In the todo popup:
 
 On startup, jirascrap loads any cached tickets from the local SQLite database and displays them immediately. In the background, it fetches fresh data from the Jira API, updates the cache, and refreshes the UI. This means the app is usable instantly, even on slow connections.
 
+When you open a ticket's detail view, comments are fetched from Jira and rendered below the description. Each comment shows the author, timestamp, and full rendered body. Up to 20 most recent comments are shown.
+
 Tags and todos are stored locally and are preserved even if a ticket is removed from your Jira query results.
 
 Press `r` at any time to manually sync with Jira.

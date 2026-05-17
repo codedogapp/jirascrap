@@ -28,9 +28,18 @@ Sleep 100ms
 # --- Select ticket → Detail view ---
 Up
 Up
+Up
 Sleep 200ms
 Enter
 Sleep 2s
+
+# --- Scroll down to see comments ---
+Down
+Down
+Down
+Down
+Down
+Sleep 1s
 
 # --- Tag the ticket ---
 Type "t"

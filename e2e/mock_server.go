@@ -143,6 +143,69 @@ type transitionTo struct {
 	StatusCategory named  `json:"statusCategory"`
 }
 
+type commentsResponse struct {
+	Total    int       `json:"total"`
+	Comments []comment `json:"comments"`
+}
+
+type comment struct {
+	ID      string `json:"id"`
+	Author  named  `json:"author"`
+	Created string `json:"created"`
+	Body    any    `json:"body"`
+}
+
+var commentsByIssue = map[string][]comment{
+	"PROJ-101": {
+		{
+			ID:      "10001",
+			Author:  named{DisplayName: "Alice Chen"},
+			Created: "2024-11-10T09:30:00.000+0000",
+			Body: adfDoc(
+				"I've confirmed the session TTL is set to 5 minutes in the auth config. We need to bump it to at least 30 min.",
+			),
+		},
+		{
+			ID:      "10002",
+			Author:  named{DisplayName: "Bob Martinez"},
+			Created: "2024-11-11T14:15:00.000+0000",
+			Body: adfDoc(
+				"I'll handle the refresh token implementation. Should we use sliding window or fixed expiry?",
+			),
+		},
+		{
+			ID:      "10003",
+			Author:  named{DisplayName: "Alice Chen"},
+			Created: "2024-11-12T10:00:00.000+0000",
+			Body:    adfDoc("Let's go with sliding window — better UX for active users."),
+		},
+	},
+	"PROJ-102": {
+		{
+			ID:      "10004",
+			Author:  named{DisplayName: "Eve Johnson"},
+			Created: "2024-11-06T11:00:00.000+0000",
+			Body:    adfDoc("Make sure we also update the syntax highlighting theme for dark mode."),
+		},
+	},
+	"PROJ-104": {
+		{
+			ID:      "10005",
+			Author:  named{DisplayName: "Dave Kim"},
+			Created: "2024-11-09T16:00:00.000+0000",
+			Body: adfDoc(
+				"Benchmarks show trigram indexes give us 3x improvement on the test dataset. Going with that approach.",
+			),
+		},
+		{
+			ID:      "10006",
+			Author:  named{DisplayName: "Carol Wu"},
+			Created: "2024-11-10T09:00:00.000+0000",
+			Body:    adfDoc("LGTM. Let's avoid ElasticSearch for now — trigrams should be sufficient for our scale."),
+		},
+	},
+}
+
 // Per-issue transitions based on current status category.
 var transitionsByStatus = map[string][]transition{
 	"In Progress": {
@@ -202,17 +265,18 @@ func main() {
 	})
 
 	// GET: return available transitions; POST: execute transition
+	// GET: return comments
 	http.HandleFunc("/rest/api/3/issue/", func(w http.ResponseWriter, r *http.Request) {
-		// Extract issue key and check path ends with /transitions
 		path := r.URL.Path
-		// /rest/api/3/issue/PROJ-101/transitions
 		const prefix = "/rest/api/3/issue/"
 		trimmed := path[len(prefix):]
 		parts := splitPath(trimmed)
-		if len(parts) != 2 || parts[1] != "transitions" {
+
+		if len(parts) != 2 {
 			http.NotFound(w, r)
 			return
 		}
+
 		issueKey := parts[0]
 		iss := findIssue(issueKey)
 		if iss == nil {
@@ -220,37 +284,53 @@ func main() {
 			return
 		}
 
-		switch r.Method {
-		case "GET":
-			statusCat := iss.Fields.Status.StatusCategory.Name
-			transitions := transitionsByStatus[statusCat]
-			if transitions == nil {
-				transitions = []transition{}
+		switch parts[1] {
+		case "comment":
+			comments := commentsByIssue[issueKey]
+			if comments == nil {
+				comments = []comment{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
+			_ = json.NewEncoder(w).Encode(commentsResponse{
+				Total:    len(comments),
+				Comments: comments,
+			})
 
-		case "POST":
-			var body struct {
-				Transition struct {
-					ID string `json:"id"`
-				} `json:"transition"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-
-			// Find the transition and apply it
-			statusCat := iss.Fields.Status.StatusCategory.Name
-			for _, t := range transitionsByStatus[statusCat] {
-				if t.ID == body.Transition.ID {
-					iss.Fields.Status.Name = t.To.Name
-					iss.Fields.Status.StatusCategory = t.To.StatusCategory
-					break
+		case "transitions":
+			switch r.Method {
+			case "GET":
+				statusCat := iss.Fields.Status.StatusCategory.Name
+				transitions := transitionsByStatus[statusCat]
+				if transitions == nil {
+					transitions = []transition{}
 				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(transitionsResponse{Transitions: transitions})
+
+			case "POST":
+				var body struct {
+					Transition struct {
+						ID string `json:"id"`
+					} `json:"transition"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+
+				statusCat := iss.Fields.Status.StatusCategory.Name
+				for _, t := range transitionsByStatus[statusCat] {
+					if t.ID == body.Transition.ID {
+						iss.Fields.Status.Name = t.To.Name
+						iss.Fields.Status.StatusCategory = t.To.StatusCategory
+						break
+					}
+				}
+				w.WriteHeader(http.StatusNoContent)
+
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			}
-			w.WriteHeader(http.StatusNoContent)
 
 		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			http.NotFound(w, r)
 		}
 	})
 

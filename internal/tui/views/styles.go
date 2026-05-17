@@ -71,6 +71,9 @@ var (
 			BorderForeground(colSecondary).
 			Padding(0, 1)
 
+	paddingStyle = lipgloss.NewStyle().
+			Padding(0, 2)
+
 	topBorder = lipgloss.NewStyle().
 			Foreground(colSecondary)
 
