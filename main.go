@@ -14,6 +14,17 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui"
 )
 
+// gooseLogger routes goose migration logs through the app logger.
+type gooseLogger struct{}
+
+func (gooseLogger) Fatalf(format string, v ...any) {
+	logger.Log.Error(fmt.Sprintf(format, v...))
+}
+
+func (gooseLogger) Printf(format string, v ...any) {
+	logger.Log.Info(fmt.Sprintf(format, v...))
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -23,24 +34,17 @@ func main() {
 
 	apiClient := jira.NewClient(cfg)
 
-	// Set up file logging
-	logFile, logPath, err := logger.OpenSessionLog(cfg.LogDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: file logging disabled: %v\n", err)
-	} else {
-		if l, ok := logger.Log.(*logger.Logger); ok {
-			l.SetOutput(logFile)
-			defer l.Close()
-		}
-		logger.Log.Info("session started, log file: " + logPath)
-	}
-
-	sqliteDB, err := store.Open(cfg.DBPath)
+	sqliteDB, err := store.Open(cfg.DBPath, gooseLogger{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		os.Exit(1)
 	}
 	defer sqliteDB.Close()
+
+	// Wire logger to persist to SQLite
+	logStore := store.NewSqliteLogStore(sqliteDB.DB)
+	logger.Log.SetPersister(logStore)
+	logger.Log.Info("session started")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

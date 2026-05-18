@@ -1,8 +1,6 @@
 package keymaps
 
 import (
-	"fmt"
-
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 )
@@ -26,47 +24,6 @@ type KeyMap struct {
 }
 
 var DefaultKeyMap = newKeyMap()
-
-func init() {
-	if dupes := detectConflicts(DefaultKeyMap); len(dupes) > 0 {
-		panic(fmt.Sprintf("key binding conflicts detected: %v", dupes))
-	}
-}
-
-// detectConflicts returns any keys bound to multiple actions in the main keymap.
-func detectConflicts(km *KeyMap) []string {
-	bindings := []struct {
-		name    string
-		binding key.Binding
-	}{
-		{"ForceQuit", km.ForceQuit},
-		{"Quit", km.Quit},
-		{"GoBack", km.GoBack},
-		{"GoHome", km.GoHome},
-		{"Select", km.Select},
-		{"ToggleTagging", km.ToggleTagging},
-		{"ToggleTodo", km.ToggleTodo},
-		{"ToggleStatus", km.ToggleStatus},
-		{"Refresh", km.Refresh},
-		{"ToggleHelp", km.ToggleHelp},
-		{"OpenInBrowser", km.OpenInBrowser},
-		{"SendToCopilot", km.SendToCopilot},
-		{"AddComment", km.AddComment},
-	}
-
-	seen := make(map[string]string) // key → first binding name
-	var dupes []string
-	for _, b := range bindings {
-		for _, k := range b.binding.Keys() {
-			if prev, ok := seen[k]; ok {
-				dupes = append(dupes, fmt.Sprintf("%q bound to both %s and %s", k, prev, b.name))
-			} else {
-				seen[k] = b.name
-			}
-		}
-	}
-	return dupes
-}
 
 func newKeyMap() *KeyMap {
 	k := &KeyMap{

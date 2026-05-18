@@ -5,7 +5,7 @@
 ## Architecture
 
 ```
-main.go → config.Load() → jira.NewClient() → logger.OpenSessionLog() → store.Open() → tui.Run()
+main.go → config.Load() → jira.NewClient() → store.Open() → logger.SetPersister() → tui.Run()
 
 ┌───────────────────────────────────────────────┐
 │  TUI (AppModel)                               │
@@ -31,18 +31,19 @@ main.go → config.Load() → jira.NewClient() → logger.OpenSessionLog() → s
   │ (Client)  │           │  TagStore        │
   │ + HTTP    │           │  TodoStore       │
   │  transport│           │  TicketCache     │
-  └───────────┘           └──────────────────┘
+  └───────────┘           │  LogStore        │
+                          └──────────────────┘
 ```
 
 ## Package Map
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| `config` | `internal/config/` | Env-var loader: Domain, Email, APIToken, DBPath, LogDir, CopilotWorkspace, CopilotModel, AllowHTTP |
-| `jira` | `internal/jira/` | HTTP client for Jira REST API v3. Fetches tickets, epic children, comments, user search. ADF↔Markdown converter. `client.go` (API ops) + `http.go` (transport/retry) + `adf_comment.go` (ADF builder with mentions) |
+| `config` | `internal/config/` | Env-var loader: Domain, Email, APIToken, DBPath, CopilotWorkspace, CopilotModel, AllowHTTP |
+| `jira` | `internal/jira/` | HTTP client for Jira REST API v3. Split into 4 sub-interfaces (`TicketFetcher`, `CommentClient`, `UserSearcher`, `TransitionClient`) composed into `TicketClient`. `client.go` (interfaces) + `client_tickets.go` + `client_comments.go` + `client_transitions.go` + `client_users.go` + `http.go` (transport/retry) + `adf_comment.go` (ADF builder with mentions) |
 | `model` | `internal/model/` | Domain types: `Ticket`, `Todo`, `Comment`, `User` |
-| `store` | `internal/store/` | SQLite persistence via 3 narrow interfaces. Goose migrations. Split into `TagStore`, `TodoStore`, `TicketCache` |
-| `logger` | `internal/logger/` | Thread-safe log buffer (max 100 entries) + file-based session logging. Global `Log` singleton. GooseLoggerAdapter |
+| `store` | `internal/store/` | SQLite persistence via 4 narrow interfaces. Goose migrations. Split into `TagStore`, `TodoStore`, `TicketCache`, `LogStore` |
+| `logger` | `internal/logger/` | Thread-safe log buffer (max 100 entries) + DB-backed persistence via `LogPersister` interface. Global `Log` singleton. GooseLoggerAdapter |
 | `tmux` | `internal/tmux/` | Wrapper around `tmux` CLI for Copilot integration |
 | `tui` | `internal/tui/` | Bubble Tea app: AppModel, PopupManager, handlers (split by domain), messages, copilot launcher |
 | `views` | `internal/tui/views/` | Sub-models: ListModel, DetailModel, CommentInputModel, TagModel, TodoModel, StatusModel, ToastModel |
@@ -94,21 +95,17 @@ type Todo struct { Title string; Done bool }
 - **`TagStore`**: `SaveMeta(id, tags)` / `GetUniqueTags()`
 - **`TodoStore`**: `GetTodos(ticketID)` / `SaveTodos(ticketID, todos)`
 - **`TicketCache`**: `CacheTickets(tickets)` / `GetCachedTickets()` / `CacheEpicChildren(epicKey, tickets)` / `GetAllCachedEpicChildren()`
+- **`LogStore`**: `InsertLog(level, message)` / `GetRecentLogs(limit)`
 
-### `jira.TicketClient` interface
-- `FetchTickets()` — JQL: `assignee = currentUser() AND statusCategory != Done`
-- `FetchEpicChildren(epicKey)` — JQL: `"Epic Link" = X OR parent = X`
-- `FetchAllEpicChildren(tickets)` — concurrent (max 5 goroutines)
-- `FetchComments(issueKey, maxResults)` — GET `/rest/api/3/issue/{key}/comment`
-- `PostComment(issueKey, body)` — POST `/rest/api/3/issue/{key}/comment` (ADF body)
-- `SearchUsers(query)` — GET `/rest/api/3/user/search?query=...`
-- `FetchTransitions(issueKey)` — GET `/rest/api/3/issue/{key}/transitions`
-- `DoTransition(issueKey, transitionID)` — POST `/rest/api/3/issue/{key}/transitions`
-- Uses POST `/rest/api/3/search/jql` with basic auth
+### `jira` interfaces (composed into `TicketClient`)
+- **`TicketFetcher`**: `FetchTickets()` / `FetchEpicChildren(epicKey)` / `FetchAllEpicChildren(tickets)`
+- **`CommentClient`**: `FetchComments(issueKey, maxResults)` / `PostComment(issueKey, body)`
+- **`UserSearcher`**: `SearchUsers(query)`
+- **`TransitionClient`**: `FetchTransitions(issueKey)` / `DoTransition(issueKey, transitionID)`
 
 ## Data Flow
 
-1. **Startup**: Load config → create client → open session log → open DB (run migrations) → `tui.Run()`
+1. **Startup**: Load config → create client → open DB (run migrations) → wire log persister → `tui.Run()`
 2. **Init**: Spinner + load cached tickets from DB + background sync from Jira API
 3. **Sync**: Fetch tickets → cache in SQLite → re-read with tags joined → update UI
 4. **Tags**: `t` key → TagModel popup → `SaveMeta()` → reload all views
@@ -139,11 +136,12 @@ Update(msg) → switch type:
 
 `handleKeyPress` uses a `keyHandler` chain pattern — global key handlers are iterated via `globalKeyHandlers()` slice. When comment input is active, keys route directly to the active model, bypassing global bindings.
 
-## Database Schema (4 migrations)
+## Database Schema (7 migrations)
 
 1. `issue_tags` — `(id TEXT, tag TEXT)` — ticket tags
 2. `issue_todos` — `(id, ticket_id, title, done)` — per-ticket todos
 3. `tickets` — `(id, summary, reporter, status, status_category, priority, type, created_at, updated_at, markdown, epic_id)` — cached tickets
+4. `logs` — `(id, level, message, created_at)` — application logs
 
 ## UI Patterns
 
@@ -194,3 +192,5 @@ bash e2e/run.sh                # e2e demo (needs vhs, ttyd, ffmpeg)
 
 - Always update README, mock server (`e2e/mock_server.go`), and e2e tape (`e2e/demo.tape`) when adding new features
 - `JIRASCRAP_ALLOW_HTTP=1` env var bypasses HTTPS validation (for e2e/testing with mock server)
+- `store.Open(dbPath, gooseLogger)` accepts a `goose.Logger` — pass `logger.GooseLoggerAdapter{}` from `main.go`
+- Logging goes to SQLite `logs` table via `LogPersister` interface — no file-based logging

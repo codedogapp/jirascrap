@@ -45,7 +45,11 @@ var (
 	RatioHeight     = 3
 	PopupWidthScale = 0.7 // fraction of content width for popup overlays
 	todoHeightRatio = 2
+)
 
+const TimestampFmt = "2006-01-02 15:04"
+
+var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colSecondary).

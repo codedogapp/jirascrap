@@ -43,35 +43,29 @@ func (s *SqliteTodoStore) GetTodos(ticketID string) ([]model.Todo, error) {
 }
 
 func (s *SqliteTodoStore) SaveTodos(ticketID string, todos []model.Todo) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("save todos for %s: begin tx: %w", ticketID, err)
-	}
-	defer tx.Rollback()
+	return withTx(
+		s.db,
+		func(q *sqlcdb.Queries) error {
+			ctx := context.Background()
 
-	q := sqlcdb.New(tx)
-	ctx := context.Background()
+			if err := q.DeleteTodosByTicket(ctx, ticketID); err != nil {
+				return fmt.Errorf("save todos for %s: delete old: %w", ticketID, err)
+			}
 
-	if err := q.DeleteTodosByTicket(ctx, ticketID); err != nil {
-		return fmt.Errorf("save todos for %s: delete old: %w", ticketID, err)
-	}
-
-	for _, t := range todos {
-		done := int64(0)
-		if t.Done {
-			done = 1
-		}
-		if err := q.InsertTodo(ctx, sqlcdb.InsertTodoParams{
-			TicketID: ticketID,
-			Title:    t.Title,
-			Done:     done,
-		}); err != nil {
-			return fmt.Errorf("save todo %q for %s: %w", t.Title, ticketID, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("save todos for %s: commit: %w", ticketID, err)
-	}
-	return nil
+			for _, t := range todos {
+				done := int64(0)
+				if t.Done {
+					done = 1
+				}
+				if err := q.InsertTodo(ctx, sqlcdb.InsertTodoParams{
+					TicketID: ticketID,
+					Title:    t.Title,
+					Done:     done,
+				}); err != nil {
+					return fmt.Errorf("save todo %q for %s: %w", t.Title, ticketID, err)
+				}
+			}
+			return nil
+		},
+	)
 }

@@ -26,7 +26,6 @@ type DetailModel struct {
 	commentsError   error
 
 	commentInput *CommentInputModel
-	contentWidth int
 }
 
 type GoToListMsg struct{}
@@ -66,7 +65,6 @@ func NewDetailModel(
 		availableHeight: availableHeight,
 		commentsLoading: true,
 		commentInput:    NewCommentInput(contentWidth),
-		contentWidth:    contentWidth,
 	}
 }
 
@@ -122,7 +120,7 @@ func getMetaData(ticket model.Ticket, width int) string {
 		dimStyle.Render(
 			fmt.Sprintf(
 				"Updated:  %s",
-				ticket.UpdatedAt.Format("2006-01-02 15:04"),
+				ticket.UpdatedAt.Format(TimestampFmt),
 			),
 		),
 	)
@@ -133,7 +131,7 @@ func getMetaData(ticket model.Ticket, width int) string {
 		dimStyle.Render(
 			fmt.Sprintf(
 				"Created:  %s",
-				ticket.CreatedAt.Format("2006-01-02 15:04"),
+				ticket.CreatedAt.Format(TimestampFmt),
 			),
 		),
 	)

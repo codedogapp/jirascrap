@@ -12,6 +12,7 @@ import (
 const (
 	commentInputHeight   = 4
 	suggestionMaxVisible = 5
+	maxCommentLength     = 5000
 )
 
 var (
@@ -53,7 +54,7 @@ func NewCommentInput(width int) *CommentInputModel {
 	ta.SetWidth(width)
 	ta.SetHeight(commentInputHeight)
 	ta.MaxHeight = commentInputHeight
-	ta.CharLimit = 5000
+	ta.CharLimit = maxCommentLength
 
 	// Override keymap: shift+enter for newline, enter handled externally
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter"))

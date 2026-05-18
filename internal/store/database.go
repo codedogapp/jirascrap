@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/codedogapp/jirascrap/internal/logger"
 	"github.com/codedogapp/jirascrap/internal/store/migrations"
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
@@ -19,7 +18,7 @@ type DB struct {
 	*sql.DB
 }
 
-func Open(dbPath string) (*DB, error) {
+func Open(dbPath string, gl goose.Logger) (*DB, error) {
 	database, err := sql.Open(SQLDriver, dbPath)
 	if err != nil {
 		return nil, err
@@ -36,10 +35,11 @@ func Open(dbPath string) (*DB, error) {
 	goose.SetBaseFS(migrations.FS)
 
 	err = goose.SetDialect(SQLDriver)
-	goose.SetLogger(logger.GooseLoggerAdapter{})
 	if err != nil {
 		return nil, fmt.Errorf("db: failed to set dialect: %w", err)
 	}
+
+	goose.SetLogger(gl)
 
 	err = goose.Up(database, ".")
 	if err != nil {

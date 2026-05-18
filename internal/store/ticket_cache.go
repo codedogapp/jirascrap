@@ -29,33 +29,23 @@ func NewSqliteTicketCache(db *sql.DB) *SqliteTicketCache {
 }
 
 func (s *SqliteTicketCache) CacheTickets(tickets []model.Ticket) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("cache tickets: begin tx: %w", err)
-	}
-	defer tx.Rollback()
+	return withTx(
+		s.db,
+		func(q *sqlcdb.Queries) error {
+			ctx := context.Background()
 
-	q := sqlcdb.New(tx)
-	ctx := context.Background()
+			if err := q.DeleteTopLevelTickets(ctx); err != nil {
+				return fmt.Errorf("cache tickets: clear old: %w", err)
+			}
 
-	if err = q.DeleteTopLevelTickets(ctx); err != nil {
-		return fmt.Errorf("cache tickets: clear old: %w", err)
-	}
-
-	if len(tickets) == 0 {
-		return tx.Commit()
-	}
-
-	for _, t := range tickets {
-		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, nil)); err != nil {
-			return fmt.Errorf("cache ticket %s: %w", t.ID, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("cache tickets: commit: %w", err)
-	}
-	return nil
+			for _, t := range tickets {
+				if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, nil)); err != nil {
+					return fmt.Errorf("cache ticket %s: %w", t.ID, err)
+				}
+			}
+			return nil
+		},
+	)
 }
 
 func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
@@ -68,7 +58,7 @@ func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
 	tickets := make([]model.Ticket, 0, len(rows))
 	for _, r := range rows {
 		tags, _ := r.Tags.(string)
-		t, err := cachedTicketRowToModel(
+		t, err := scanTicketRow(
 			r.ID,
 			r.Summary,
 			r.Reporter,
@@ -90,29 +80,23 @@ func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
 }
 
 func (s *SqliteTicketCache) CacheEpicChildren(epicKey string, tickets []model.Ticket) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("cache epic %s children: begin tx: %w", epicKey, err)
-	}
-	defer tx.Rollback()
+	return withTx(
+		s.db,
+		func(q *sqlcdb.Queries) error {
+			ctx := context.Background()
 
-	q := sqlcdb.New(tx)
-	ctx := context.Background()
+			if err := q.DeleteEpicChildren(ctx, &epicKey); err != nil {
+				return fmt.Errorf("cache epic %s children: clear old: %w", epicKey, err)
+			}
 
-	if err = q.DeleteEpicChildren(ctx, &epicKey); err != nil {
-		return fmt.Errorf("cache epic %s children: clear old: %w", epicKey, err)
-	}
-
-	for _, t := range tickets {
-		if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, &epicKey)); err != nil {
-			return fmt.Errorf("cache epic %s child %s: %w", epicKey, t.ID, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("cache epic %s children: commit: %w", epicKey, err)
-	}
-	return nil
+			for _, t := range tickets {
+				if err := q.UpsertTicket(ctx, ticketToUpsertParams(t, &epicKey)); err != nil {
+					return fmt.Errorf("cache epic %s child %s: %w", epicKey, t.ID, err)
+				}
+			}
+			return nil
+		},
+	)
 }
 
 func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticket, error) {
@@ -125,19 +109,8 @@ func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticke
 	result := make(map[string][]model.Ticket)
 	for _, r := range rows {
 		tags, _ := r.Tags.(string)
-		t, err := cachedTicketRowToModel(
-			r.ID,
-			r.Summary,
-			r.Reporter,
-			r.Status,
-			r.StatusCategory,
-			r.Priority,
-			r.Type,
-			r.CreatedAt,
-			r.UpdatedAt,
-			r.Markdown,
-			tags,
-		)
+		t, err := scanTicketRow(r.ID, r.Summary, r.Reporter, r.Status, r.StatusCategory,
+			r.Priority, r.Type, r.CreatedAt, r.UpdatedAt, r.Markdown, tags)
 		if err != nil {
 			return nil, fmt.Errorf("get epic children: %w", err)
 		}
@@ -168,9 +141,19 @@ func ticketToUpsertParams(t model.Ticket, epicID *string) sqlcdb.UpsertTicketPar
 	}
 }
 
-func cachedTicketRowToModel(
-	id, summary, reporter, status, statusCategory, priority, typ,
-	createdAt, updatedAt, markdown, tags string,
+// scanTicketRow converts raw DB column values into a model.Ticket.
+func scanTicketRow(
+	id,
+	summary,
+	reporter,
+	status,
+	statusCategory,
+	priority,
+	typ,
+	createdAt,
+	updatedAt,
+	markdown,
+	tags string,
 ) (model.Ticket, error) {
 	t := model.Ticket{
 		ID:             id,
@@ -184,11 +167,11 @@ func cachedTicketRowToModel(
 	}
 
 	var err error
-	t.CreatedAt, err = parseTime(createdAt)
+	t.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
 	if err != nil {
 		return model.Ticket{}, err
 	}
-	t.UpdatedAt, err = parseTime(updatedAt)
+	t.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 	if err != nil {
 		return model.Ticket{}, err
 	}

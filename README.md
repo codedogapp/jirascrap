@@ -29,7 +29,7 @@ Set these environment variables before running:
 | `JIRA_EMAIL` | Yes | Email associated with your Atlassian account |
 | `JIRA_API_TOKEN` | Yes | API token from [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
 | `JIRA_DB_PATH` | No | Path to SQLite database file (default: `./data/jira.db`) |
-| `JIRASCRAP_LOG_DIR` | No | Directory for session log files (default: `~/.local/state/jirascrap/logs/`) |
+
 | `JIRASCRAP_COPILOT_WORKSPACE` | No | Directory where Copilot CLI launches (default: current working directory) |
 | `JIRASCRAP_COPILOT_MODEL` | No | AI model for initial planning (default: `claude-haiku-4.5`) |
 
@@ -87,7 +87,7 @@ Press `r` at any time to manually sync with Jira.
 
 ## Logging
 
-Session logs are written to `~/.local/state/jirascrap/logs/` (configurable via `JIRASCRAP_LOG_DIR`). Each app session creates a timestamped log file. The 10 most recent log files are kept; older ones are pruned automatically.
+Logs are persisted to the same SQLite database used for tickets and tags (in the `logs` table). No separate log files or directories are needed. The in-memory log buffer (max 100 entries) is available for debugging during the session.
 
 ## Copilot CLI Integration
 

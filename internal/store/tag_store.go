@@ -24,29 +24,23 @@ func NewSqliteTagStore(db *sql.DB) *SqliteTagStore {
 }
 
 func (s *SqliteTagStore) SaveTags(id string, tags []string) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("save tags for %s: begin tx: %w", id, err)
-	}
-	defer tx.Rollback()
+	return withTx(
+		s.db,
+		func(q *sqlcdb.Queries) error {
+			ctx := context.Background()
 
-	q := sqlcdb.New(tx)
-	ctx := context.Background()
+			if err := q.DeleteTagsByID(ctx, id); err != nil {
+				return fmt.Errorf("save tags for %s: delete old: %w", id, err)
+			}
 
-	if err = q.DeleteTagsByID(ctx, id); err != nil {
-		return fmt.Errorf("save tags for %s: delete old: %w", id, err)
-	}
-
-	for _, tag := range tags {
-		if err = q.InsertTag(ctx, sqlcdb.InsertTagParams{ID: id, Tag: tag}); err != nil {
-			return fmt.Errorf("save tag %q for %s: %w", tag, id, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("save tags for %s: commit: %w", id, err)
-	}
-	return nil
+			for _, tag := range tags {
+				if err := q.InsertTag(ctx, sqlcdb.InsertTagParams{ID: id, Tag: tag}); err != nil {
+					return fmt.Errorf("save tag %q for %s: %w", tag, id, err)
+				}
+			}
+			return nil
+		},
+	)
 }
 
 func (s *SqliteTagStore) GetUniqueTags() ([]string, error) {

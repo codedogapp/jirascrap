@@ -77,7 +77,7 @@ func renderComment(c model.Comment, renderer *glamour.TermRenderer) string {
 	var sb strings.Builder
 
 	author := boldStyle.Render(c.Author)
-	ts := dimStyle.Render(c.CreatedAt.Format("2006-01-02 15:04"))
+	ts := dimStyle.Render(c.CreatedAt.Format(TimestampFmt))
 	sb.WriteString(author + " · " + ts + "\n\n")
 
 	if c.Markdown == "" {
