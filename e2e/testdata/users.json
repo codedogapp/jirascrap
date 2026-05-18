@@ -1,0 +1,22 @@
+[
+  {
+    "accountId": "user-001",
+    "displayName": "Alice Chen"
+  },
+  {
+    "accountId": "user-002",
+    "displayName": "Bob Martinez"
+  },
+  {
+    "accountId": "user-003",
+    "displayName": "Carol Wu"
+  },
+  {
+    "accountId": "user-004",
+    "displayName": "Dave Kim"
+  },
+  {
+    "accountId": "user-005",
+    "displayName": "Eve Johnson"
+  }
+]

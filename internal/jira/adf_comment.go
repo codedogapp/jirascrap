@@ -5,46 +5,76 @@ import (
 	"strings"
 )
 
+// ADF (Atlassian Document Format) types for building structured comment bodies.
+
+type AdfDocument struct {
+	Type    string     `json:"type"`
+	Version float64    `json:"version"`
+	Content []adfBlock `json:"content"`
+}
+
+type adfBlock struct {
+	Type    string      `json:"type"`
+	Content []adfInline `json:"content"`
+}
+
+type adfInline struct {
+	Type  string        `json:"type"`
+	Text  string        `json:"text,omitempty"`
+	Attrs *adfMentionAt `json:"attrs,omitempty"`
+}
+
+type adfMentionAt struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
 // BuildCommentADF takes plain text with @mentions and a mention map (displayName→accountId)
 // and produces an ADF document with proper mention nodes.
-func BuildCommentADF(text string, mentions map[string]string) any {
+func BuildCommentADF(text string, mentions map[string]string) AdfDocument {
 	lines := strings.Split(text, "\n")
-	var blocks []any
+	var blocks []adfBlock
 
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
-			blocks = append(blocks, map[string]any{
-				"type":    adfParagraph,
-				"content": []any{map[string]any{"type": adfText, "text": " "}},
-			})
+			blocks = append(
+				blocks,
+				adfBlock{
+					Type:    adfParagraph,
+					Content: []adfInline{{Type: adfText, Text: " "}},
+				},
+			)
 			continue
 		}
 		content := buildInlineWithMentions(line, mentions)
-		blocks = append(blocks, map[string]any{
-			"type":    adfParagraph,
-			"content": content,
-		})
+		blocks = append(
+			blocks,
+			adfBlock{
+				Type:    adfParagraph,
+				Content: content,
+			},
+		)
 	}
 
 	if len(blocks) == 0 {
-		blocks = []any{
-			map[string]any{
-				"type":    adfParagraph,
-				"content": []any{map[string]any{"type": adfText, "text": " "}},
+		blocks = []adfBlock{
+			{
+				Type:    adfParagraph,
+				Content: []adfInline{{Type: adfText, Text: " "}},
 			},
 		}
 	}
 
-	return map[string]any{
-		"type":    adfDoc,
-		"version": float64(1),
-		"content": blocks,
+	return AdfDocument{
+		Type:    adfDoc,
+		Version: 1,
+		Content: blocks,
 	}
 }
 
-func buildInlineWithMentions(line string, mentions map[string]string) []any {
+func buildInlineWithMentions(line string, mentions map[string]string) []adfInline {
 	if len(mentions) == 0 {
-		return []any{map[string]any{"type": adfText, "text": line}}
+		return []adfInline{{Type: adfText, Text: line}}
 	}
 
 	// Sort mention names longest-first to avoid partial matches (e.g. "Al" vs "Alice").
@@ -52,11 +82,14 @@ func buildInlineWithMentions(line string, mentions map[string]string) []any {
 	for name := range mentions {
 		names = append(names, name)
 	}
-	sort.Slice(names, func(i, j int) bool {
-		return len(names[i]) > len(names[j])
-	})
+	sort.Slice(
+		names,
+		func(i, j int) bool {
+			return len(names[i]) > len(names[j])
+		},
+	)
 
-	var nodes []any
+	var nodes []adfInline
 	remaining := line
 
 	for remaining != "" {
@@ -75,21 +108,24 @@ func buildInlineWithMentions(line string, mentions map[string]string) []any {
 		}
 
 		if earliest == -1 {
-			nodes = append(nodes, map[string]any{"type": adfText, "text": remaining})
+			nodes = append(nodes, adfInline{Type: adfText, Text: remaining})
 			break
 		}
 
 		if earliest > 0 {
-			nodes = append(nodes, map[string]any{"type": adfText, "text": remaining[:earliest]})
+			nodes = append(nodes, adfInline{Type: adfText, Text: remaining[:earliest]})
 		}
 
-		nodes = append(nodes, map[string]any{
-			"type": adfMention,
-			"attrs": map[string]any{
-				"id":   matchedID,
-				"text": "@" + matchedName,
+		nodes = append(
+			nodes,
+			adfInline{
+				Type: adfMention,
+				Attrs: &adfMentionAt{
+					ID:   matchedID,
+					Text: "@" + matchedName,
+				},
 			},
-		})
+		)
 
 		remaining = remaining[earliest+len("@"+matchedName):]
 	}

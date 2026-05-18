@@ -41,7 +41,7 @@ type CommentInputModel struct {
 	suggestions []model.User
 	showSuggest bool
 	selectedIdx int
-	mentions    map[string]string // displayName → accountId
+	mentions    map[string]string // displayName -> accountId
 	ticketID    string
 	width       int
 	atQuery     string // current @query being typed

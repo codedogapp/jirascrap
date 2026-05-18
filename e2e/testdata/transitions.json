@@ -1,0 +1,90 @@
+{
+  "In Progress": [
+    {
+      "id": "21",
+      "name": "Done",
+      "to": {
+        "name": "Done",
+        "statusCategory": {
+          "name": "Done"
+        }
+      }
+    },
+    {
+      "id": "11",
+      "name": "To Do",
+      "to": {
+        "name": "To Do",
+        "statusCategory": {
+          "name": "To Do"
+        }
+      }
+    },
+    {
+      "id": "41",
+      "name": "In Review",
+      "to": {
+        "name": "In Review",
+        "statusCategory": {
+          "name": "In Progress"
+        }
+      }
+    }
+  ],
+  "To Do": [
+    {
+      "id": "31",
+      "name": "In Progress",
+      "to": {
+        "name": "In Progress",
+        "statusCategory": {
+          "name": "In Progress"
+        }
+      }
+    },
+    {
+      "id": "21",
+      "name": "Done",
+      "to": {
+        "name": "Done",
+        "statusCategory": {
+          "name": "Done"
+        }
+      }
+    }
+  ],
+  "Done": [
+    {
+      "id": "11",
+      "name": "Reopen",
+      "to": {
+        "name": "To Do",
+        "statusCategory": {
+          "name": "To Do"
+        }
+      }
+    }
+  ],
+  "Blocked": [
+    {
+      "id": "31",
+      "name": "In Progress",
+      "to": {
+        "name": "In Progress",
+        "statusCategory": {
+          "name": "In Progress"
+        }
+      }
+    },
+    {
+      "id": "11",
+      "name": "To Do",
+      "to": {
+        "name": "To Do",
+        "statusCategory": {
+          "name": "To Do"
+        }
+      }
+    }
+  ]
+}

@@ -7,52 +7,43 @@ import (
 
 func TestBuildCommentADF_PlainText(t *testing.T) {
 	result := BuildCommentADF("Hello world", nil)
-	got := mustJSON(t, result)
 
-	expected := mustJSON(t, adf(
-		paragraph(map[string]any{"type": "text", "text": "Hello world"}),
-	))
-	if got != expected {
-		t.Errorf("got %s, want %s", got, expected)
+	if result.Type != adfDoc {
+		t.Errorf("type = %v, want doc", result.Type)
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("expected 1 paragraph, got %d", len(result.Content))
+	}
+	if result.Content[0].Content[0].Text != "Hello world" {
+		t.Errorf("text = %q", result.Content[0].Content[0].Text)
 	}
 }
 
 func TestBuildCommentADF_Multiline(t *testing.T) {
 	result := BuildCommentADF("line one\nline two", nil)
 
-	doc, ok := result.(map[string]any)
-	if !ok {
-		t.Fatal("expected map")
-	}
-	content := doc["content"].([]any)
-	if len(content) != 2 {
-		t.Fatalf("expected 2 paragraphs, got %d", len(content))
+	if len(result.Content) != 2 {
+		t.Fatalf("expected 2 paragraphs, got %d", len(result.Content))
 	}
 }
 
 func TestBuildCommentADF_EmptyLine(t *testing.T) {
 	result := BuildCommentADF("before\n\nafter", nil)
 
-	doc := result.(map[string]any)
-	content := doc["content"].([]any)
-	if len(content) != 3 {
-		t.Fatalf("expected 3 paragraphs, got %d", len(content))
+	if len(result.Content) != 3 {
+		t.Fatalf("expected 3 paragraphs, got %d", len(result.Content))
 	}
 	// middle paragraph should be a space (empty line)
-	mid := content[1].(map[string]any)
-	inlines := mid["content"].([]any)
-	txt := inlines[0].(map[string]any)["text"].(string)
-	if txt != " " {
-		t.Errorf("empty line text = %q, want \" \"", txt)
+	if result.Content[1].Content[0].Text != " " {
+		t.Errorf("empty line text = %q, want \" \"", result.Content[1].Content[0].Text)
 	}
 }
 
 func TestBuildCommentADF_EmptyInput(t *testing.T) {
 	result := BuildCommentADF("", nil)
-	doc := result.(map[string]any)
-	content := doc["content"].([]any)
-	if len(content) != 1 {
-		t.Fatalf("expected 1 fallback paragraph, got %d", len(content))
+
+	if len(result.Content) != 1 {
+		t.Fatalf("expected 1 fallback paragraph, got %d", len(result.Content))
 	}
 }
 
@@ -60,36 +51,30 @@ func TestBuildCommentADF_WithMention(t *testing.T) {
 	mentions := map[string]string{"Alice": "abc-123"}
 	result := BuildCommentADF("Hey @Alice check this", mentions)
 
-	doc := result.(map[string]any)
-	content := doc["content"].([]any)
-	para := content[0].(map[string]any)
-	inlines := para["content"].([]any)
-
+	inlines := result.Content[0].Content
 	if len(inlines) != 3 {
-		t.Fatalf("expected 3 inline nodes, got %d: %s", len(inlines), mustJSON(t, inlines))
+		t.Fatalf("expected 3 inline nodes, got %d", len(inlines))
 	}
 
 	// "Hey "
-	if inlines[0].(map[string]any)["text"] != "Hey " {
-		t.Errorf("node[0] text = %v", inlines[0])
+	if inlines[0].Text != "Hey " {
+		t.Errorf("node[0] text = %q", inlines[0].Text)
 	}
 
 	// mention
-	mention := inlines[1].(map[string]any)
-	if mention["type"] != "mention" {
-		t.Errorf("node[1] type = %v", mention["type"])
+	if inlines[1].Type != adfMention {
+		t.Errorf("node[1] type = %v", inlines[1].Type)
 	}
-	attrs := mention["attrs"].(map[string]any)
-	if attrs["id"] != "abc-123" {
-		t.Errorf("mention id = %v", attrs["id"])
+	if inlines[1].Attrs.ID != "abc-123" {
+		t.Errorf("mention id = %v", inlines[1].Attrs.ID)
 	}
-	if attrs["text"] != "@Alice" {
-		t.Errorf("mention text = %v", attrs["text"])
+	if inlines[1].Attrs.Text != "@Alice" {
+		t.Errorf("mention text = %v", inlines[1].Attrs.Text)
 	}
 
 	// " check this"
-	if inlines[2].(map[string]any)["text"] != " check this" {
-		t.Errorf("node[2] text = %v", inlines[2])
+	if inlines[2].Text != " check this" {
+		t.Errorf("node[2] text = %q", inlines[2].Text)
 	}
 }
 
@@ -100,22 +85,20 @@ func TestBuildCommentADF_MultipleMentions(t *testing.T) {
 	}
 	result := BuildCommentADF("@Alice and @Bob", mentions)
 
-	doc := result.(map[string]any)
-	para := doc["content"].([]any)[0].(map[string]any)
-	inlines := para["content"].([]any)
+	inlines := result.Content[0].Content
 
 	// Should have: mention(Alice), " and ", mention(Bob)
 	if len(inlines) != 3 {
-		t.Fatalf("expected 3 nodes, got %d: %s", len(inlines), mustJSON(t, inlines))
+		t.Fatalf("expected 3 nodes, got %d", len(inlines))
 	}
 
-	if inlines[0].(map[string]any)["type"] != "mention" {
+	if inlines[0].Type != adfMention {
 		t.Errorf("node[0] should be mention")
 	}
-	if inlines[1].(map[string]any)["text"] != " and " {
-		t.Errorf("node[1] text = %v", inlines[1])
+	if inlines[1].Text != " and " {
+		t.Errorf("node[1] text = %q", inlines[1].Text)
 	}
-	if inlines[2].(map[string]any)["type"] != "mention" {
+	if inlines[2].Type != adfMention {
 		t.Errorf("node[2] should be mention")
 	}
 }
@@ -128,21 +111,16 @@ func TestBuildCommentADF_OverlappingMentions(t *testing.T) {
 	}
 	result := BuildCommentADF("Hey @Alice", mentions)
 
-	doc := result.(map[string]any)
-	para := doc["content"].([]any)[0].(map[string]any)
-	inlines := para["content"].([]any)
-
+	inlines := result.Content[0].Content
 	if len(inlines) != 2 {
-		t.Fatalf("expected 2 nodes, got %d: %s", len(inlines), mustJSON(t, inlines))
+		t.Fatalf("expected 2 nodes, got %d", len(inlines))
 	}
 
-	mention := inlines[1].(map[string]any)
-	attrs := mention["attrs"].(map[string]any)
-	if attrs["id"] != "long-id" {
-		t.Errorf("should match longest name 'Alice' (long-id), got %v", attrs["id"])
+	if inlines[1].Attrs.ID != "long-id" {
+		t.Errorf("should match longest name 'Alice' (long-id), got %v", inlines[1].Attrs.ID)
 	}
-	if attrs["text"] != "@Alice" {
-		t.Errorf("mention text = %v", attrs["text"])
+	if inlines[1].Attrs.Text != "@Alice" {
+		t.Errorf("mention text = %v", inlines[1].Attrs.Text)
 	}
 }
 
@@ -150,16 +128,14 @@ func TestBuildCommentADF_NoMentionMatch(t *testing.T) {
 	mentions := map[string]string{"Alice": "abc-123"}
 	result := BuildCommentADF("Hey @Bob", mentions)
 
-	doc := result.(map[string]any)
-	para := doc["content"].([]any)[0].(map[string]any)
-	inlines := para["content"].([]any)
+	inlines := result.Content[0].Content
 
 	// No mention should be created — just plain text
 	if len(inlines) != 1 {
 		t.Fatalf("expected 1 text node, got %d", len(inlines))
 	}
-	if inlines[0].(map[string]any)["text"] != "Hey @Bob" {
-		t.Errorf("text = %v", inlines[0])
+	if inlines[0].Text != "Hey @Bob" {
+		t.Errorf("text = %q", inlines[0].Text)
 	}
 }
 
