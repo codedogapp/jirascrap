@@ -16,20 +16,28 @@ func (m *AppModel) updateCommentMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case commentsLoadedMsg:
 		return m.handleCommentsLoaded(msg)
+
 	case commentsErrorMsg:
 		return m.handleCommentsError(msg)
+
 	case views.CommentSubmitMsg:
 		return m.handleCommentSubmit(msg)
+
 	case views.CommentCancelMsg:
 		return m, nil
+
 	case commentPostSuccessMsg:
 		return m.handleCommentPostSuccess(msg)
+
 	case commentPostErrorMsg:
 		return m.handleCommentPostError(msg)
+
 	case views.UserSearchRequestMsg:
 		return m.handleUserSearchRequest(msg)
+
 	case userSearchResultMsg:
 		return m.handleUserSearchResult(msg)
+
 	default:
 		return m, nil
 	}

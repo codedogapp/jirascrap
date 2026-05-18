@@ -18,14 +18,19 @@ func (m *AppModel) updateNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case views.SelectTicketMsg:
 		return m.handleSelectTicket(msg)
+
 	case views.GoToListMsg:
 		return m.handleGoToList(msg)
+
 	case epicChildrenLoadedMsg:
 		return m.handleEpicChildrenLoaded(msg)
+
 	case epicChildrenErrorMsg:
 		return m.handleError(views.ErrMsg{Err: msg.err})
+
 	case copilotLaunchedMsg:
 		return m.handleCopilotLaunched(msg)
+
 	default:
 		return m, nil
 	}

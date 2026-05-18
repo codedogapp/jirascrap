@@ -54,17 +54,10 @@ func (m *ToastModel) View() *lipgloss.Layer {
 		return nil
 	}
 
-	w := 2
-	toastStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Bold(true).
-		Foreground(lipgloss.Color("#10B981")).
-		Padding(0, w)
-
 	content := toastStyle.Render(m.message)
 
 	return lipgloss.NewLayer(content).
-		X(m.terminalWidth - lipgloss.Width(content) - w).
+		X(m.terminalWidth - lipgloss.Width(content) - 2).
 		Y(2).
 		Z(ZToast)
 }

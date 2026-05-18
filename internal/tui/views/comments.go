@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"charm.land/glamour/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
@@ -56,7 +55,7 @@ func commentsView(comments []model.Comment, total int, width int) string {
 	for i, c := range comments {
 		sb.WriteString(renderComment(c, renderer))
 		if i < len(comments)-1 {
-			sb.WriteString("\n" + dimStyle.Render("──────────────") + "\n\n")
+			sb.WriteString("\n" + dimStyle.Padding(0, 0).Render("──────────────") + "\n\n")
 		}
 	}
 
@@ -77,7 +76,7 @@ func commentsHeader(shown, total int) string {
 func renderComment(c model.Comment, renderer *glamour.TermRenderer) string {
 	var sb strings.Builder
 
-	author := lipgloss.NewStyle().Bold(true).Render(c.Author)
+	author := boldStyle.Render(c.Author)
 	ts := dimStyle.Render(c.CreatedAt.Format("2006-01-02 15:04"))
 	sb.WriteString(author + " · " + ts + "\n\n")
 

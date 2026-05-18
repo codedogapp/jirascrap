@@ -6,7 +6,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
@@ -259,15 +258,13 @@ func (m *CommentInputModel) View() string {
 			}
 			line := "  " + u.DisplayName
 			if i == m.selectedIdx {
-				line = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")).Render("▸ " + u.DisplayName)
+				line = suggestionSelectedStyle.Render("▸ " + u.DisplayName)
 			}
 			sb.WriteString(line + "\n")
 		}
 	}
 
-	border := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
+	border := commentInputBorder.
 		Width(m.width - 2)
 
 	sb.WriteString(border.Render(m.textarea.View()))

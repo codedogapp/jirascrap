@@ -80,6 +80,22 @@ var (
 	tagListStyle = lipgloss.NewStyle().Foreground(colSecondary)
 
 	epicBoltStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5A623"))
+
+	boldStyle = lipgloss.NewStyle().Bold(true)
+
+	suggestionSelectedStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("212"))
+
+	commentInputBorder = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("62"))
+
+	toastStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			Bold(true).
+			Foreground(green).
+			Padding(0, 2)
 )
 
 func statusColor(status string) color.Color {

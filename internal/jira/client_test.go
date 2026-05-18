@@ -537,18 +537,17 @@ func TestFetchComments_Success(t *testing.T) {
 		t.Fatalf("expected 2 comments, got %d", len(comments))
 	}
 
-	// Comments are reversed (oldest first)
-	if comments[0].ID != "101" {
-		t.Errorf("comments[0].ID = %q, want 101 (reversed order)", comments[0].ID)
-	}
-	if comments[0].Author != "Bob" {
-		t.Errorf("comments[0].Author = %q", comments[0].Author)
-	}
-	if comments[1].ID != "100" {
+	if comments[0].ID != "100" {
 		t.Errorf("comments[1].ID = %q, want 100", comments[1].ID)
 	}
-	if comments[1].Author != "Alice" {
+	if comments[0].Author != "Alice" {
 		t.Errorf("comments[1].Author = %q", comments[1].Author)
+	}
+	if comments[1].ID != "101" {
+		t.Errorf("comments[0].ID = %q, want 101 (reversed order)", comments[0].ID)
+	}
+	if comments[1].Author != "Bob" {
+		t.Errorf("comments[0].Author = %q", comments[0].Author)
 	}
 }
 

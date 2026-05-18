@@ -171,8 +171,8 @@ func (c *Client) FetchComments(ctx context.Context, issueKey string, maxResults 
 	}
 
 	comments := make([]model.Comment, 0, len(result.Comments))
-	for i := len(result.Comments) - 1; i >= 0; i-- {
-		entry := result.Comments[i]
+	for comment := range result.Comments {
+		entry := result.Comments[comment]
 		comments = append(comments, model.Comment{
 			ID:        entry.ID,
 			Author:    entry.Author.DisplayName,
