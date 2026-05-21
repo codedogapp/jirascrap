@@ -13,9 +13,9 @@ import (
 )
 
 type TagModel struct {
+	popupState
 	tagInput      textinput.Model
 	ticket        model.Ticket
-	visible       bool
 	contentWidth  int
 	contentHeight int
 	allTags       []string
@@ -48,14 +48,6 @@ func (m *TagModel) Show(ticket model.Ticket) tea.Cmd {
 	m.selectedIdx = -1
 	m.tagInput.SetValue(strings.Join(ticket.Tags, ", "))
 	return m.tagInput.Focus()
-}
-
-func (m *TagModel) Hide() {
-	m.visible = false
-}
-
-func (m *TagModel) IsVisible() bool {
-	return m.visible
 }
 
 func (m *TagModel) CurrentTags() []string {

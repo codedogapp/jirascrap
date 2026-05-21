@@ -1,0 +1,179 @@
+{
+  "issues": [
+    {
+      "key": "PROJ-101",
+      "fields": {
+        "summary": "Fix authentication timeout",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Users are getting logged out after 5 minutes. We need to extend the session TTL and add a refresh token flow."
+                }
+              ]
+            }
+          ]
+        },
+        "reporter": {
+          "displayName": "Alice Chen"
+        },
+        "status": {
+          "name": "In Progress",
+          "statusCategory": {
+            "name": "In Progress"
+          }
+        },
+        "priority": {
+          "name": "High"
+        },
+        "created": "2024-11-01T09:00:00.000+0000",
+        "updated": "2024-11-15T14:30:00.000+0000"
+      }
+    },
+    {
+      "key": "PROJ-102",
+      "fields": {
+        "summary": "Add dark mode support",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Implement a dark color scheme that respects the user's OS preference. Should also have a manual toggle in settings."
+                }
+              ]
+            }
+          ]
+        },
+        "reporter": {
+          "displayName": "Bob Martinez"
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "name": "To Do"
+          }
+        },
+        "priority": {
+          "name": "Medium"
+        },
+        "created": "2024-11-05T11:00:00.000+0000",
+        "updated": "2024-11-10T08:15:00.000+0000"
+      }
+    },
+    {
+      "key": "PROJ-103",
+      "fields": {
+        "summary": "Database migration fails on PostgreSQL 16",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The goose migration 005 uses a deprecated syntax that PG16 no longer accepts. Need to rewrite the ALTER TABLE statement."
+                }
+              ]
+            }
+          ]
+        },
+        "reporter": {
+          "displayName": "Carol Wu"
+        },
+        "status": {
+          "name": "Done",
+          "statusCategory": {
+            "name": "Done"
+          }
+        },
+        "priority": {
+          "name": "Highest"
+        },
+        "created": "2024-10-20T16:45:00.000+0000",
+        "updated": "2024-11-12T10:00:00.000+0000"
+      }
+    },
+    {
+      "key": "PROJ-104",
+      "fields": {
+        "summary": "Optimize search indexing",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Full-text search is slow on large datasets. Consider switching to trigram indexes or adding ElasticSearch."
+                }
+              ]
+            }
+          ]
+        },
+        "reporter": {
+          "displayName": "Dave Kim"
+        },
+        "status": {
+          "name": "In Review",
+          "statusCategory": {
+            "name": "In Progress"
+          }
+        },
+        "priority": {
+          "name": "Low"
+        },
+        "created": "2024-11-08T13:20:00.000+0000",
+        "updated": "2024-11-14T17:00:00.000+0000"
+      }
+    },
+    {
+      "key": "PROJ-105",
+      "fields": {
+        "summary": "Update API documentation",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The REST API docs are out of date. Endpoints added in v2.3 are missing. Regenerate from OpenAPI spec."
+                }
+              ]
+            }
+          ]
+        },
+        "reporter": {
+          "displayName": "Eve Johnson"
+        },
+        "status": {
+          "name": "Blocked",
+          "statusCategory": {
+            "name": "Blocked"
+          }
+        },
+        "priority": {
+          "name": "Lowest"
+        },
+        "created": "2024-11-02T10:00:00.000+0000",
+        "updated": "2024-11-13T09:30:00.000+0000"
+      }
+    }
+  ]
+}

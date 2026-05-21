@@ -1,0 +1,140 @@
+{
+  "PROJ-101": [
+    {
+      "id": "10001",
+      "author": {
+        "displayName": "Alice Chen"
+      },
+      "created": "2024-11-10T09:30:00.000+0000",
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "I've confirmed the session TTL is set to 5 minutes in the auth config. We need to bump it to at least 30 min."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10002",
+      "author": {
+        "displayName": "Bob Martinez"
+      },
+      "created": "2024-11-11T14:15:00.000+0000",
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "I'll handle the refresh token implementation. Should we use sliding window or fixed expiry?"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10003",
+      "author": {
+        "displayName": "Alice Chen"
+      },
+      "created": "2024-11-12T10:00:00.000+0000",
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Let's go with sliding window — better UX for active users."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "PROJ-102": [
+    {
+      "id": "10004",
+      "author": {
+        "displayName": "Eve Johnson"
+      },
+      "created": "2024-11-06T11:00:00.000+0000",
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Make sure we also update the syntax highlighting theme for dark mode."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "PROJ-104": [
+    {
+      "id": "10005",
+      "author": {
+        "displayName": "Dave Kim"
+      },
+      "created": "2024-11-09T16:00:00.000+0000",
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Benchmarks show trigram indexes give us 3x improvement on the test dataset. Going with that approach."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10006",
+      "author": {
+        "displayName": "Carol Wu"
+      },
+      "created": "2024-11-10T09:00:00.000+0000",
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "LGTM. Let's avoid ElasticSearch for now — trigrams should be sufficient for our scale."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

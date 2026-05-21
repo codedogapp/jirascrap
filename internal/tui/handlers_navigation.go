@@ -14,6 +14,28 @@ import (
 	"github.com/codedogapp/jirascrap/internal/tui/views"
 )
 
+func (m *AppModel) updateNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case views.SelectTicketMsg:
+		return m.handleSelectTicket(msg)
+
+	case views.GoToListMsg:
+		return m.handleGoToList(msg)
+
+	case epicChildrenLoadedMsg:
+		return m.handleEpicChildrenLoaded(msg)
+
+	case epicChildrenErrorMsg:
+		return m.handleError(views.ErrMsg{Err: msg.err})
+
+	case copilotLaunchedMsg:
+		return m.handleCopilotLaunched(msg)
+
+	default:
+		return m, nil
+	}
+}
+
 func (m *AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.list.SetSize(msg.Width, msg.Height)
 
@@ -47,7 +69,7 @@ func (m *AppModel) handleSelectTicket(msg views.SelectTicketMsg) (tea.Model, tea
 	}
 
 	m.activeModel = views.NewDetailModel(msg.Ticket, m.width, m.height, m.styles)
-	return m, nil
+	return m, m.fetchCommentsCmd(msg.Ticket.ID)
 }
 
 func (m *AppModel) showEpicChildren(epicKey string, tickets []model.Ticket) (tea.Model, tea.Cmd) {

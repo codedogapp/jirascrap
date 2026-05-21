@@ -53,6 +53,18 @@ func (c *mockClient) DoTransition(_ context.Context, _ string, _ string) error {
 	return c.doTransErr
 }
 
+func (c *mockClient) FetchComments(_ context.Context, _ string, _ int) ([]model.Comment, int, error) {
+	return nil, 0, nil
+}
+
+func (c *mockClient) PostComment(_ context.Context, _ string, _ any) error {
+	return nil
+}
+
+func (c *mockClient) SearchUsers(_ context.Context, _ string) ([]model.User, error) {
+	return nil, nil
+}
+
 // --- Test helpers ---
 
 var testTickets = []model.Ticket{

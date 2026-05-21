@@ -1,15 +1,22 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
-	"time"
+
+	"github.com/codedogapp/jirascrap/internal/store/sqlcdb"
 )
 
-// parseTime parses an RFC3339 timestamp, returning an error on failure.
-func parseTime(s string) (time.Time, error) {
-	t, err := time.Parse(time.RFC3339, s)
+// withTx runs fn within a transaction. It commits on success and rolls back on error.
+func withTx(db *sql.DB, fn func(q *sqlcdb.Queries) error) error {
+	tx, err := db.Begin()
 	if err != nil {
-		return time.Time{}, fmt.Errorf("parse time %q: %w", s, err)
+		return fmt.Errorf("begin tx: %w", err)
 	}
-	return t, nil
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := fn(sqlcdb.New(tx)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

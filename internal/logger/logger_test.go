@@ -1,17 +1,26 @@
 package logger
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 )
 
 func newTestLogger() *Logger {
 	return &Logger{minLevel: DEBUG}
+}
+
+// mockPersister records InsertLog calls for testing.
+type mockPersister struct {
+	mu      sync.Mutex
+	entries []struct{ level, message string }
+}
+
+func (m *mockPersister) InsertLog(level, message string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.entries = append(m.entries, struct{ level, message string }{level, message})
+	return nil
 }
 
 func TestLogger_BasicLevels(t *testing.T) {
@@ -126,89 +135,33 @@ func TestLogger_Concurrent(t *testing.T) {
 	}
 }
 
-func TestLogger_WritesToFile(t *testing.T) {
-	var buf bytes.Buffer
+func TestLogger_PersistsToDB(t *testing.T) {
 	l := newTestLogger()
-	l.SetOutput(&buf)
+	p := &mockPersister{}
+	l.SetPersister(p)
 
 	l.Warn("disk full")
 	l.Error("crash")
 
-	output := buf.String()
-	if !strings.Contains(output, "[WARN ] disk full") {
-		t.Errorf("missing WARN in file output: %s", output)
-	}
-	if !strings.Contains(output, "[ERROR] crash") {
-		t.Errorf("missing ERROR in file output: %s", output)
+	if len(p.entries) != 2 {
+		t.Fatalf("expected 2 persisted entries, got %d", len(p.entries))
 	}
 
-	// Should have timestamps
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for _, line := range lines {
-		if len(line) < 23 {
-			t.Errorf("line too short for timestamp: %q", line)
-		}
+	if p.entries[0].level != "WARN" || p.entries[0].message != "disk full" {
+		t.Errorf("entry[0]: got %+v", p.entries[0])
+	}
+	if p.entries[1].level != "ERROR" || p.entries[1].message != "crash" {
+		t.Errorf("entry[1]: got %+v", p.entries[1])
 	}
 }
 
-func TestOpenSessionLog(t *testing.T) {
-	dir := t.TempDir()
-	logDir := filepath.Join(dir, "logs")
+func TestLogger_NoPersisterNoPanic(t *testing.T) {
+	l := newTestLogger()
+	// Should not panic without a persister
+	l.Info("no persister")
+	l.Error("still fine")
 
-	f, path, err := OpenSessionLog(logDir)
-	if err != nil {
-		t.Fatalf("OpenSessionLog: %v", err)
-	}
-	defer f.Close()
-
-	if !strings.HasPrefix(path, logDir) {
-		t.Errorf("path %q not in dir %q", path, logDir)
-	}
-	if !strings.Contains(path, "session-") {
-		t.Errorf("path missing session- prefix: %q", path)
-	}
-
-	// Write and verify
-	fmt.Fprintln(f, "test line")
-	f.Close()
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if !strings.Contains(string(data), "test line") {
-		t.Errorf("log file missing content")
-	}
-}
-
-func TestPruneOldLogs(t *testing.T) {
-	dir := t.TempDir()
-
-	// Create 15 fake log files
-	for i := range 15 {
-		name := fmt.Sprintf("session-20260101-%06d.log", i)
-		os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644)
-	}
-
-	// Also create a non-log file that should be ignored
-	os.WriteFile(filepath.Join(dir, "other.txt"), []byte("x"), 0o644)
-
-	pruneOldLogs(dir)
-
-	entries, _ := os.ReadDir(dir)
-	logCount := 0
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "session-") {
-			logCount++
-		}
-	}
-
-	if logCount != maxLogFiles {
-		t.Errorf("expected %d log files after prune, got %d", maxLogFiles, logCount)
-	}
-
-	// other.txt should still exist
-	if _, err := os.Stat(filepath.Join(dir, "other.txt")); err != nil {
-		t.Errorf("non-log file was deleted: %v", err)
+	if len(l.Logs()) != 2 {
+		t.Errorf("expected 2 logs in memory")
 	}
 }

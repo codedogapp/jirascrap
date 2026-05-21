@@ -25,20 +25,18 @@ type TransitionItem struct {
 func (i TransitionItem) FilterValue() string { return i.Name }
 
 type StatusModel struct {
-	ticket        model.Ticket
-	list          list.Model
-	visible       bool
-	loading       bool
-	contentWidth  int
-	contentHeight int
+	popupState
+	ticket       model.Ticket
+	list         list.Model
+	loading      bool
+	contentWidth int
 }
 
 func NewStatusModel(contentWidth, contentHeight int) *StatusModel {
 	l := newTransitionList(contentWidth, 0)
 	return &StatusModel{
-		list:          l,
-		contentWidth:  contentWidth,
-		contentHeight: contentHeight,
+		list:         l,
+		contentWidth: contentWidth,
 	}
 }
 
@@ -47,7 +45,7 @@ func newTransitionList(width, itemCount int) list.Model {
 	if w < 30 {
 		w = 30
 	}
-	delegate := transitionDelegate{}
+	delegate := transitionDelegate{baseDelegate{height: 1, spacing: 0}}
 	h := statusListHeightForItems(itemCount)
 	l := list.New(nil, delegate, w, h)
 	l.SetShowHelp(false)
@@ -73,12 +71,8 @@ func (m *StatusModel) Show(ticket model.Ticket) {
 }
 
 func (m *StatusModel) Hide() {
-	m.visible = false
+	m.popupState.Hide()
 	m.loading = false
-}
-
-func (m *StatusModel) IsVisible() bool {
-	return m.visible
 }
 
 func (m *StatusModel) SetTransitions(transitions []jira.Transition) {
@@ -93,7 +87,6 @@ func (m *StatusModel) SetTransitions(transitions []jira.Transition) {
 
 func (m *StatusModel) SetSize(contentWidth, contentHeight int) {
 	m.contentWidth = contentWidth
-	m.contentHeight = contentHeight
 	w := contentWidth / RatioWidth
 	if w < 30 {
 		w = 30
@@ -164,18 +157,7 @@ func (m *StatusModel) View() *lipgloss.Layer {
 	)
 }
 
-type transitionDelegate struct{}
-
-func (d transitionDelegate) Height() int {
-	return 1
-}
-func (d transitionDelegate) Spacing() int {
-	return 0
-}
-
-func (d transitionDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd {
-	return nil
-}
+type transitionDelegate struct{ baseDelegate }
 
 func (d transitionDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	i, ok := item.(TransitionItem)

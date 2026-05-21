@@ -13,18 +13,8 @@ type Config struct {
 	Email            string
 	APIToken         string
 	DBPath           string
-	LogDir           string
 	CopilotWorkspace string
 	CopilotModel     string
-}
-
-// String implements fmt.Stringer, masking the API token to prevent accidental logging.
-func (c *Config) String() string {
-	masked := "***"
-	if len(c.APIToken) > 4 {
-		masked = c.APIToken[:4] + "***"
-	}
-	return fmt.Sprintf("Config{Domain:%s Email:%s APIToken:%s DBPath:%s}", c.Domain, c.Email, masked, c.DBPath)
 }
 
 func Load() (*Config, error) {
@@ -33,21 +23,12 @@ func Load() (*Config, error) {
 		Email:            os.Getenv("JIRA_EMAIL"),
 		APIToken:         os.Getenv("JIRA_API_TOKEN"),
 		DBPath:           os.Getenv("JIRA_DB_PATH"),
-		LogDir:           os.Getenv("JIRASCRAP_LOG_DIR"),
 		CopilotWorkspace: os.Getenv("JIRASCRAP_COPILOT_WORKSPACE"),
 		CopilotModel:     os.Getenv("JIRASCRAP_COPILOT_MODEL"),
 	}
 
 	if cfg.DBPath == "" {
 		cfg.DBPath = "./data/jira.db"
-	}
-
-	if cfg.LogDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		cfg.LogDir = filepath.Join(home, ".local", "state", "jirascrap", "logs")
 	}
 
 	if cfg.CopilotWorkspace == "" {
@@ -103,7 +84,7 @@ func Load() (*Config, error) {
 func (c *Config) Validate() error {
 	var errs []error
 
-	if !strings.HasPrefix(c.Domain, "https://") {
+	if !strings.HasPrefix(c.Domain, "https://") && !c.allowHTTP() {
 		errs = append(errs, fmt.Errorf("JIRA_BASE_URL must use HTTPS (got %q)", c.Domain))
 	}
 
@@ -115,4 +96,8 @@ func (c *Config) Validate() error {
 		return errors.Join(errs...)
 	}
 	return nil
+}
+
+func (c *Config) allowHTTP() bool {
+	return os.Getenv("JIRASCRAP_ALLOW_HTTP") == "1"
 }

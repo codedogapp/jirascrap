@@ -32,6 +32,7 @@ export JIRA_BASE_URL="http://localhost:$MOCK_PORT"
 export JIRA_EMAIL="test@e2e.com"
 export JIRA_API_TOKEN="fake-token"
 export JIRA_DB_PATH="$DB_PATH"
+export JIRASCRAP_ALLOW_HTTP="1"
 export PATH="$SCRIPT_DIR:$PATH"
 
 # Run VHS tape

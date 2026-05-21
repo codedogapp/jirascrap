@@ -28,7 +28,28 @@ Sleep 100ms
 # --- Select ticket → Detail view ---
 Up
 Up
+Up
 Sleep 200ms
+Enter
+Sleep 2s
+
+# --- Scroll down to see comments ---
+Down
+Down
+Down
+Down
+Down
+Sleep 1s
+
+# --- Add a comment ---
+Type "a"
+Sleep 1s
+Type "@Alice"
+Sleep 1s
+Tab
+Sleep 1s
+Type "Looking good! "
+Sleep 500ms
 Enter
 Sleep 2s
 

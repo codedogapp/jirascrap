@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -487,5 +488,198 @@ func TestFetchAllEpicChildren_CollectsErrors(t *testing.T) {
 	// Should still have partial results
 	if len(result) != 1 {
 		t.Errorf("expected 1 successful result, got %d", len(result))
+	}
+}
+
+func TestFetchComments_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/rest/api/3/issue/PROJ-1/comment" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if r.URL.Query().Get("maxResults") != "20" {
+			t.Errorf("maxResults = %q", r.URL.Query().Get("maxResults"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"total": 2,
+			"comments": [
+				{
+					"id": "100",
+					"author": {"displayName": "Alice"},
+					"created": "2024-03-01T10:00:00.000+0000",
+					"body": {"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"First comment"}]}]}
+				},
+				{
+					"id": "101",
+					"author": {"displayName": "Bob"},
+					"created": "2024-03-02T12:00:00.000+0000",
+					"body": {"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Second comment"}]}]}
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	comments, total, err := client.FetchComments(context.Background(), "PROJ-1", 20)
+	if err != nil {
+		t.Fatalf("FetchComments: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("total = %d, want 2", total)
+	}
+	if len(comments) != 2 {
+		t.Fatalf("expected 2 comments, got %d", len(comments))
+	}
+
+	if comments[0].ID != "100" {
+		t.Errorf("comments[1].ID = %q, want 100", comments[1].ID)
+	}
+	if comments[0].Author != "Alice" {
+		t.Errorf("comments[1].Author = %q", comments[1].Author)
+	}
+	if comments[1].ID != "101" {
+		t.Errorf("comments[0].ID = %q, want 101 (reversed order)", comments[0].ID)
+	}
+	if comments[1].Author != "Bob" {
+		t.Errorf("comments[0].Author = %q", comments[0].Author)
+	}
+}
+
+func TestFetchComments_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errorMessages":["Issue not found"]}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	_, _, err := client.FetchComments(context.Background(), "BAD-1", 20)
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+}
+
+func TestPostComment_Success(t *testing.T) {
+	var receivedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		if r.URL.Path != "/rest/api/3/issue/PROJ-1/comment" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+
+		json.NewDecoder(r.Body).Decode(&receivedBody)
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"id":"200"}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	body := BuildCommentADF("Hello", nil)
+	err := client.PostComment(context.Background(), "PROJ-1", body)
+	if err != nil {
+		t.Fatalf("PostComment: %v", err)
+	}
+
+	if receivedBody["body"] == nil {
+		t.Error("request body missing 'body' field")
+	}
+}
+
+func TestPostComment_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"errorMessages":["Invalid body"]}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	err := client.PostComment(context.Background(), "PROJ-1", map[string]any{})
+	if err == nil {
+		t.Fatal("expected error for 400 response")
+	}
+}
+
+func TestSearchUsers_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "/rest/api/3/user/search") {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if r.URL.Query().Get("query") != "ali" {
+			t.Errorf("query = %q, want 'ali'", r.URL.Query().Get("query"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[
+			{"accountId": "abc-123", "displayName": "Alice"},
+			{"accountId": "def-456", "displayName": "Alicia"}
+		]`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	users, err := client.SearchUsers(context.Background(), "ali")
+	if err != nil {
+		t.Fatalf("SearchUsers: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("expected 2 users, got %d", len(users))
+	}
+	if users[0].AccountID != "abc-123" || users[0].DisplayName != "Alice" {
+		t.Errorf("users[0] = %+v", users[0])
+	}
+	if users[1].AccountID != "def-456" || users[1].DisplayName != "Alicia" {
+		t.Errorf("users[1] = %+v", users[1])
+	}
+}
+
+func TestSearchUsers_URLEncoding(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The query should be properly URL-encoded
+		if r.URL.Query().Get("query") != "foo bar" {
+			t.Errorf("query = %q, want 'foo bar'", r.URL.Query().Get("query"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	users, err := client.SearchUsers(context.Background(), "foo bar")
+	if err != nil {
+		t.Fatalf("SearchUsers: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("expected 0 users, got %d", len(users))
+	}
+}
+
+func TestSearchUsers_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message":"Unauthorized"}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, server.Client())
+
+	_, err := client.SearchUsers(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error for 401 response")
 	}
 }

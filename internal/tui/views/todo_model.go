@@ -27,12 +27,12 @@ type TodoItem struct {
 func (i TodoItem) FilterValue() string { return i.Title }
 
 type TodoModel struct {
+	popupState
 	list          list.Model
 	help          help.Model
 	textInput     textinput.Model
 	ticketID      string
 	adding        bool
-	visible       bool
 	contentWidth  int
 	contentHeight int
 }
@@ -46,7 +46,7 @@ func NewTodoModel(contentWidth, contentHeight int, ticketID string, todos []mode
 		items[i] = TodoItem{t}
 	}
 
-	delegate := todoDelegate{}
+	delegate := todoDelegate{baseDelegate{height: 1, spacing: 0}}
 	l := list.New(items, delegate, w, h)
 	l.Title = ""
 	l.SetShowHelp(false)
@@ -76,12 +76,8 @@ func (m *TodoModel) Show() {
 }
 
 func (m *TodoModel) Hide() {
-	m.visible = false
+	m.popupState.Hide()
 	m.adding = false
-}
-
-func (m *TodoModel) IsVisible() bool {
-	return m.visible
 }
 
 func (m *TodoModel) IsAdding() bool {
@@ -216,19 +212,7 @@ func (m *TodoModel) View() *lipgloss.Layer {
 	)
 }
 
-type todoDelegate struct{}
-
-func (d todoDelegate) Height() int {
-	return 1
-}
-
-func (d todoDelegate) Spacing() int {
-	return 0
-}
-
-func (d todoDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd {
-	return nil
-}
+type todoDelegate struct{ baseDelegate }
 
 func (d todoDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	i, ok := item.(TodoItem)

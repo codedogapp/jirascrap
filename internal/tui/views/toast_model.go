@@ -8,10 +8,9 @@ import (
 )
 
 type ToastModel struct {
-	message        string
-	version        int
-	terminalWidth  int
-	terminalHeight int
+	message       string
+	version       int
+	terminalWidth int
 }
 
 type ToastTimeoutMsg struct {
@@ -20,8 +19,7 @@ type ToastTimeoutMsg struct {
 
 func NewToastModel(width, height int) *ToastModel {
 	return &ToastModel{
-		terminalWidth:  width,
-		terminalHeight: height,
+		terminalWidth: width,
 	}
 }
 
@@ -46,7 +44,6 @@ func (m *ToastModel) Hide() {
 
 func (m *ToastModel) SetSize(width, height int) {
 	m.terminalWidth = width
-	m.terminalHeight = height
 }
 
 func (m *ToastModel) View() *lipgloss.Layer {
@@ -54,17 +51,10 @@ func (m *ToastModel) View() *lipgloss.Layer {
 		return nil
 	}
 
-	w := 2
-	toastStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Bold(true).
-		Foreground(lipgloss.Color("#10B981")).
-		Padding(0, w)
-
 	content := toastStyle.Render(m.message)
 
 	return lipgloss.NewLayer(content).
-		X(m.terminalWidth - lipgloss.Width(content) - w).
+		X(m.terminalWidth - lipgloss.Width(content) - 2).
 		Y(2).
 		Z(ZToast)
 }

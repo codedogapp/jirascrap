@@ -183,10 +183,6 @@ func (d ticketDelegate) Spacing() int {
 	return 1
 }
 
-func (d ticketDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
-	return nil
-}
-
 func (d ticketDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	i, ok := item.(TicketItem)
 	if !ok {

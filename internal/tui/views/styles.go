@@ -45,7 +45,11 @@ var (
 	RatioHeight     = 3
 	PopupWidthScale = 0.7 // fraction of content width for popup overlays
 	todoHeightRatio = 2
+)
 
+const TimestampFmt = "2006-01-02 15:04"
+
+var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colSecondary).
@@ -71,12 +75,31 @@ var (
 			BorderForeground(colSecondary).
 			Padding(0, 1)
 
+	paddingStyle = lipgloss.NewStyle().
+			Padding(0, 2)
+
 	topBorder = lipgloss.NewStyle().
 			Foreground(colSecondary)
 
 	tagListStyle = lipgloss.NewStyle().Foreground(colSecondary)
 
 	epicBoltStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5A623"))
+
+	boldStyle = lipgloss.NewStyle().Bold(true)
+
+	suggestionSelectedStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("212"))
+
+	commentInputBorder = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("62"))
+
+	toastStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			Bold(true).
+			Foreground(green).
+			Padding(0, 2)
 )
 
 func statusColor(status string) color.Color {
