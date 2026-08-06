@@ -1,9 +1,14 @@
 version: 2
+
 updates:
-  - package-ecosystem: "gomod"
+  - package-ecosystem: gomod
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: weekly
+    groups:
+      gomod:
+        patterns:
+          - "*"  # Group all updates into a single larger pull request.
 
   - package-ecosystem: "github-actions"
     directory: "/"
