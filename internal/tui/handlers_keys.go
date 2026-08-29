@@ -42,7 +42,6 @@ func (m *AppModel) globalKeyHandlers() []keyHandler {
 		m.handleToggleTag,
 		m.handleToggleTodo,
 		m.handleToggleStatus,
-		m.handleSendToCopilot,
 	}
 }
 

@@ -199,10 +199,7 @@ func (m *CommentInputModel) acceptSuggestion() {
 
 	// Replace the @query with @DisplayName
 	val := m.textarea.Value()
-	atIdx := strings.LastIndex(val, "@"+m.atQuery)
-	if atIdx != -1 {
-		before := val[:atIdx]
-		after := val[atIdx+1+len(m.atQuery):]
+	if before, after, found := strings.CutLast(val, "@"+m.atQuery); found {
 		m.textarea.SetValue(before + "@" + user.DisplayName + " " + after)
 	}
 
@@ -214,13 +211,12 @@ func (m *CommentInputModel) acceptSuggestion() {
 func (m *CommentInputModel) checkAtTrigger() tea.Cmd {
 	val := m.textarea.Value()
 	// Find the last @ that isn't followed by a space
-	lastAt := strings.LastIndex(val, "@")
-	if lastAt == -1 {
+	_, afterAt, found := strings.CutLast(val, "@")
+	if !found {
 		m.showSuggest = false
 		return nil
 	}
 
-	afterAt := val[lastAt+1:]
 	// If there's a space after @, no active query
 	if strings.Contains(afterAt, " ") || strings.Contains(afterAt, "\n") {
 		m.showSuggest = false

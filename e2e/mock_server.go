@@ -59,6 +59,11 @@ type userEntry struct {
 	DisplayName string `json:"displayName"`
 }
 
+const (
+	headerContentType = "Content-Type"
+	mimeJSON          = "application/json"
+)
+
 // Server state loaded from embedded fixtures.
 var (
 	issues              []issue
@@ -123,7 +128,7 @@ func main() {
 }
 
 func handleSearch(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, mimeJSON)
 	_ = json.NewEncoder(w).Encode(map[string]any{"issues": issues})
 }
 
@@ -159,7 +164,7 @@ func handleComment(w http.ResponseWriter, r *http.Request, issueKey string) {
 		if comments == nil {
 			comments = []comment{}
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, mimeJSON)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"total":    len(comments),
 			"comments": comments,
@@ -194,7 +199,7 @@ func handleTransitions(w http.ResponseWriter, r *http.Request, iss *issue) {
 		if transitions == nil {
 			transitions = []transition{}
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, mimeJSON)
 		_ = json.NewEncoder(w).Encode(map[string]any{"transitions": transitions})
 
 	case "POST":
@@ -231,13 +236,13 @@ func handleUserSearch(w http.ResponseWriter, r *http.Request) {
 	if results == nil {
 		results = []userEntry{}
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, mimeJSON)
 	_ = json.NewEncoder(w).Encode(results)
 }
 
 func splitPath(p string) []string {
 	var parts []string
-	for _, s := range strings.Split(p, "/") {
+	for s := range strings.SplitSeq(p, "/") {
 		if s != "" {
 			parts = append(parts, s)
 		}

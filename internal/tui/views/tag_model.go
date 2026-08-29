@@ -90,9 +90,8 @@ func (m *TagModel) Update(msg tea.KeyPressMsg) tea.Cmd {
 
 func (m *TagModel) currentWord() string {
 	val := m.tagInput.Value()
-	lastComma := strings.LastIndex(val, ",")
-	if lastComma >= 0 {
-		return strings.TrimSpace(val[lastComma+1:])
+	if _, after, found := strings.CutLast(val, ","); found {
+		return strings.TrimSpace(after)
 	}
 	return strings.TrimSpace(val)
 }
@@ -138,10 +137,9 @@ func (m *TagModel) completeSuggestion() {
 	}
 	suggestion := m.suggestions[m.selectedIdx]
 	val := m.tagInput.Value()
-	lastComma := strings.LastIndex(val, ",")
 	var newVal string
-	if lastComma >= 0 {
-		newVal = val[:lastComma+1] + " " + suggestion
+	if before, _, found := strings.CutLast(val, ","); found {
+		newVal = before + ", " + suggestion
 	} else {
 		newVal = suggestion
 	}

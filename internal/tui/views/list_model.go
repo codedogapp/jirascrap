@@ -41,13 +41,13 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 		0,
 	)
 	l.Title = "Jira Tickets"
+	l.DisableQuitKeybindings()
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			keymaps.DefaultKeyMap.ToggleTagging,
 			keymaps.DefaultKeyMap.ToggleTodo,
 			keymaps.DefaultKeyMap.ToggleStatus,
 			keymaps.DefaultKeyMap.OpenInBrowser,
-			keymaps.DefaultKeyMap.SendToCopilot,
 		}
 	}
 	l.AdditionalFullHelpKeys = func() []key.Binding {
@@ -56,7 +56,6 @@ func NewListModel(tickets []model.Ticket, style lipgloss.Style) *ListModel {
 			keymaps.DefaultKeyMap.ToggleTodo,
 			keymaps.DefaultKeyMap.ToggleStatus,
 			keymaps.DefaultKeyMap.OpenInBrowser,
-			keymaps.DefaultKeyMap.SendToCopilot,
 			keymaps.DefaultKeyMap.Select,
 			keymaps.DefaultKeyMap.Refresh,
 		}

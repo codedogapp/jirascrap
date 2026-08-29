@@ -181,7 +181,7 @@ func (d transitionDelegate) Render(w io.Writer, m list.Model, index int, item li
 		style = style.Bold(true).Foreground(colPrimary)
 	}
 
-	fmt.Fprintf(w, "%s", style.Render(cursor+dot+name))
+	_, _ = fmt.Fprintf(w, "%s", style.Render(cursor+dot+name))
 }
 
 // StatusKeyMap is used internally; the actual key routing happens in app.go.

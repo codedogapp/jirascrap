@@ -1,7 +1,8 @@
 package jira
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strings"
 )
 
@@ -32,10 +33,9 @@ type adfMentionAt struct {
 // BuildCommentADF takes plain text with @mentions and a mention map (displayName→accountId)
 // and produces an ADF document with proper mention nodes.
 func BuildCommentADF(text string, mentions map[string]string) AdfDocument {
-	lines := strings.Split(text, "\n")
 	var blocks []adfBlock
 
-	for _, line := range lines {
+	for line := range strings.SplitSeq(text, "\n") {
 		if strings.TrimSpace(line) == "" {
 			blocks = append(
 				blocks,
@@ -82,12 +82,9 @@ func buildInlineWithMentions(line string, mentions map[string]string) []adfInlin
 	for name := range mentions {
 		names = append(names, name)
 	}
-	sort.Slice(
-		names,
-		func(i, j int) bool {
-			return len(names[i]) > len(names[j])
-		},
-	)
+	slices.SortFunc(names, func(a, b string) int {
+		return cmp.Compare(len(b), len(a))
+	})
 
 	var nodes []adfInline
 	remaining := line

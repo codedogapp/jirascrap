@@ -26,12 +26,19 @@ import (
 type TicketFetcher interface {
 	FetchTickets(ctx context.Context) ([]model.Ticket, error)
 	FetchEpicChildren(ctx context.Context, epicKey string) ([]model.Ticket, error)
-	FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error)
+	FetchAllEpicChildren(
+		ctx context.Context,
+		tickets []model.Ticket,
+	) (map[string][]model.Ticket, error)
 }
 
 // CommentClient handles comment retrieval and posting.
 type CommentClient interface {
-	FetchComments(ctx context.Context, issueKey string, maxResults int) ([]model.Comment, int, error)
+	FetchComments(
+		ctx context.Context,
+		issueKey string,
+		maxResults int,
+	) ([]model.Comment, int, error)
 	PostComment(ctx context.Context, issueKey string, body any) error
 }
 

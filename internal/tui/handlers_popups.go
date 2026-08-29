@@ -237,7 +237,9 @@ func (m *AppModel) doTransitionCmd(issueKey string, transition jira.Transition) 
 	}
 }
 
-func (m *AppModel) handleStatusTransitionComplete(msg statusTransitionCompleteMsg) (tea.Model, tea.Cmd) {
+func (m *AppModel) handleStatusTransitionComplete(
+	msg statusTransitionCompleteMsg,
+) (tea.Model, tea.Cmd) {
 	m.updateTicketStatus(msg.ticketID, msg.newStatus, msg.newStatusCategory)
 
 	toastCmd := m.popups.toast.Show(fmt.Sprintf("→ %s", msg.newStatus))
@@ -256,31 +258,40 @@ func (m *AppModel) updateTicketStatus(ticketID, newStatus, newStatusCategory str
 		}
 	}
 
-	if root := m.rootList(); root != nil {
-		if _, ok := root.FindTicket(ticketID); ok {
-			tickets, err := m.ticketCache.GetCachedTickets()
-			if err != nil {
-				logger.Log.Warn(fmt.Sprintf("failed to re-read tickets for status update: %v", err))
-			} else {
-				update(tickets)
-				root.SetItems(tickets)
-			}
-		}
-	}
+	m.updateRootListStatus(ticketID, update)
 
 	for _, children := range m.epicChildren {
 		update(children)
 	}
 
 	m.refreshCurrentEpicView()
+	m.updateDetailViewStatus(ticketID, newStatus, newStatusCategory)
+}
 
-	// Update detail view if showing this ticket
-	if dm, ok := m.activeDetailModel(); ok {
-		if dm.Ticket().ID == ticketID {
-			ticket := dm.Ticket()
-			ticket.Status = newStatus
-			ticket.StatusCategory = newStatusCategory
-			dm.UpdateTags(ticket)
-		}
+func (m *AppModel) updateRootListStatus(ticketID string, update func([]model.Ticket)) {
+	root := m.rootList()
+	if root == nil {
+		return
 	}
+	if _, ok := root.FindTicket(ticketID); !ok {
+		return
+	}
+	tickets, err := m.ticketCache.GetCachedTickets()
+	if err != nil {
+		logger.Log.Warn(fmt.Sprintf("failed to re-read tickets for status update: %v", err))
+		return
+	}
+	update(tickets)
+	root.SetItems(tickets)
+}
+
+func (m *AppModel) updateDetailViewStatus(ticketID, newStatus, newStatusCategory string) {
+	dm, ok := m.activeDetailModel()
+	if !ok || dm.Ticket().ID != ticketID {
+		return
+	}
+	ticket := dm.Ticket()
+	ticket.Status = newStatus
+	ticket.StatusCategory = newStatusCategory
+	dm.UpdateTags(ticket)
 }

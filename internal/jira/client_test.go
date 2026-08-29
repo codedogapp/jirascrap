@@ -204,7 +204,11 @@ func TestFetchTransitions_Success(t *testing.T) {
 		t.Errorf("transition[0] = %+v", transitions[0])
 	}
 	if transitions[0].ToStatus != "Done" || transitions[0].ToStatusCategory != "Done" {
-		t.Errorf("transition[0] to = %q / %q", transitions[0].ToStatus, transitions[0].ToStatusCategory)
+		t.Errorf(
+			"transition[0] to = %q / %q",
+			transitions[0].ToStatus,
+			transitions[0].ToStatusCategory,
+		)
 	}
 	if transitions[1].ID != "31" || transitions[1].Name != "In Progress" {
 		t.Errorf("transition[1] = %+v", transitions[1])

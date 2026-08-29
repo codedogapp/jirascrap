@@ -235,5 +235,5 @@ func (d todoDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		}
 	}
 
-	fmt.Fprintf(w, "%s", style.Render(cursor+checkbox+i.Title))
+	_, _ = fmt.Fprintf(w, "%s", style.Render(cursor+checkbox+i.Title))
 }

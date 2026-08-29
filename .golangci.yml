@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
@@ -15,40 +17,50 @@ linters:
     - nilerr
     - reassign
     - bodyclose
+  settings:
+    errcheck:
+      exclude-functions:
+        # Standard Go pattern: deferred Rollback after Commit
+        - (*database/sql.Tx).Rollback
+      check-type-assertions: true
+    gocyclo:
+      min-complexity: 25
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+  exclusions:
+    rules:
+      # Tests: unchecked errors in HTTP handlers and helpers are fine
+      - path: _test\.go
+        linters:
+          - errcheck
+          - goconst
+          - gocyclo
+          - unparam
+      # Bubble Tea convention: message types use XxxMsg not XxxError
+      - linters:
+          - errname
+        text: "ErrMsg"
+      # Handler methods keep consistent (bool, tea.Cmd) signature for key routing
+      - path: handlers_
+        linters:
+          - unparam
+    paths:
+      - e2e
 
-linters-settings:
-  errcheck:
-    exclude-functions:
-      # Standard Go pattern: deferred Rollback after Commit
-      - (*database/sql.Tx).Rollback
-    check-type-assertions: true
-  gocyclo:
-    min-complexity: 25
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - shadow
-
-issues:
-  exclude-dirs:
-    - e2e
-  exclude-rules:
-    # Tests: unchecked errors in HTTP handlers and helpers are fine
-    - path: _test\.go
-      linters:
-        - errcheck
-        - goconst
-        - gocyclo
-        - unparam
-    # Bubble Tea convention: message types use XxxMsg not XxxError
-    - linters:
-        - errname
-      text: "ErrMsg"
-    # Handler methods keep consistent (bool, tea.Cmd) signature for key routing
-    - path: handlers_
-      linters:
-        - unparam
+formatters:
+  enable:
+    - gofumpt
+    - golines
+  settings:
+    golines:
+      max-len: 100
+      tab-len: 4
+      shorten-comments: false
+      reformat-tags: true
+      chain-split-dots: true

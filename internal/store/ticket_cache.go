@@ -58,19 +58,19 @@ func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
 	tickets := make([]model.Ticket, 0, len(rows))
 	for _, r := range rows {
 		tags, _ := r.Tags.(string)
-		t, err := scanTicketRow(
-			r.ID,
-			r.Summary,
-			r.Reporter,
-			r.Status,
-			r.StatusCategory,
-			r.Priority,
-			r.Type,
-			r.CreatedAt,
-			r.UpdatedAt,
-			r.Markdown,
-			tags,
-		)
+		t, err := scanTicketRow(ticketRowData{
+			ID:             r.ID,
+			Summary:        r.Summary,
+			Reporter:       r.Reporter,
+			Status:         r.Status,
+			StatusCategory: r.StatusCategory,
+			Priority:       r.Priority,
+			Type:           r.Type,
+			CreatedAt:      r.CreatedAt,
+			UpdatedAt:      r.UpdatedAt,
+			Markdown:       r.Markdown,
+			Tags:           tags,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("get cached tickets: %w", err)
 		}
@@ -109,8 +109,19 @@ func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticke
 	result := make(map[string][]model.Ticket)
 	for _, r := range rows {
 		tags, _ := r.Tags.(string)
-		t, err := scanTicketRow(r.ID, r.Summary, r.Reporter, r.Status, r.StatusCategory,
-			r.Priority, r.Type, r.CreatedAt, r.UpdatedAt, r.Markdown, tags)
+		t, err := scanTicketRow(ticketRowData{
+			ID:             r.ID,
+			Summary:        r.Summary,
+			Reporter:       r.Reporter,
+			Status:         r.Status,
+			StatusCategory: r.StatusCategory,
+			Priority:       r.Priority,
+			Type:           r.Type,
+			CreatedAt:      r.CreatedAt,
+			UpdatedAt:      r.UpdatedAt,
+			Markdown:       r.Markdown,
+			Tags:           tags,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("get epic children: %w", err)
 		}
@@ -141,43 +152,40 @@ func ticketToUpsertParams(t model.Ticket, epicID *string) sqlcdb.UpsertTicketPar
 	}
 }
 
+// ticketRowData holds raw DB column values for constructing a model.Ticket.
+type ticketRowData struct {
+	ID, Summary, Reporter          string
+	Status, StatusCategory         string
+	Priority, Type                 string
+	CreatedAt, UpdatedAt, Markdown string
+	Tags                           string
+}
+
 // scanTicketRow converts raw DB column values into a model.Ticket.
-func scanTicketRow(
-	id,
-	summary,
-	reporter,
-	status,
-	statusCategory,
-	priority,
-	typ,
-	createdAt,
-	updatedAt,
-	markdown,
-	tags string,
-) (model.Ticket, error) {
+func scanTicketRow(d ticketRowData) (model.Ticket, error) {
 	t := model.Ticket{
-		ID:             id,
-		Summary:        summary,
-		Reporter:       reporter,
-		Status:         status,
-		StatusCategory: statusCategory,
-		Priority:       priority,
-		Type:           typ,
-		Markdown:       markdown,
+		ID:             d.ID,
+		Summary:        d.Summary,
+		Reporter:       d.Reporter,
+		Status:         d.Status,
+		StatusCategory: d.StatusCategory,
+		Priority:       d.Priority,
+		Type:           d.Type,
+		Markdown:       d.Markdown,
 	}
 
 	var err error
-	t.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+	t.CreatedAt, err = time.Parse(time.RFC3339, d.CreatedAt)
 	if err != nil {
 		return model.Ticket{}, err
 	}
-	t.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
+	t.UpdatedAt, err = time.Parse(time.RFC3339, d.UpdatedAt)
 	if err != nil {
 		return model.Ticket{}, err
 	}
 
-	if tags != "" {
-		t.Tags = strings.Split(tags, ",")
+	if d.Tags != "" {
+		t.Tags = strings.Split(d.Tags, ",")
 	}
 	return t, nil
 }

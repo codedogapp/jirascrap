@@ -35,11 +35,6 @@ type epicChildrenErrorMsg struct {
 	err error
 }
 
-type copilotLaunchedMsg struct {
-	ticketID string
-	err      error
-}
-
 type transitionsLoadedMsg struct {
 	ticketID    string
 	transitions []jira.Transition

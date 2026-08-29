@@ -39,7 +39,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		os.Exit(1)
 	}
-	defer sqliteDB.Close()
+	defer sqliteDB.Close() //nolint:errcheck // best-effort cleanup
 
 	// Wire logger to persist to SQLite
 	logStore := store.NewSqliteLogStore(sqliteDB.DB)

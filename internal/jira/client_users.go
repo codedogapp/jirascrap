@@ -10,7 +10,11 @@ import (
 )
 
 func (c *Client) SearchUsers(ctx context.Context, query string) ([]model.User, error) {
-	url := fmt.Sprintf("%s/rest/api/3/user/search?query=%s&maxResults=5", c.domain, neturl.QueryEscape(query))
+	url := fmt.Sprintf(
+		"%s/rest/api/3/user/search?query=%s&maxResults=5",
+		c.domain,
+		neturl.QueryEscape(query),
+	)
 
 	respBody, err := c.doRequest(ctx, "GET", url, nil)
 	if err != nil {

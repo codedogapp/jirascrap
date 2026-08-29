@@ -135,7 +135,9 @@ func TestHandleSyncComplete_UpdatesList(t *testing.T) {
 	app := newHandlerTestApp(nil)
 	app.syncing = true
 
-	app.handleSyncComplete(syncCompleteMsg{tickets: tickets, epicChildren: map[string][]model.Ticket{}})
+	app.handleSyncComplete(
+		syncCompleteMsg{tickets: tickets, epicChildren: map[string][]model.Ticket{}},
+	)
 
 	if !app.synced {
 		t.Error("expected synced=true after handleSyncComplete")

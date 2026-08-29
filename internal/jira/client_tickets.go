@@ -67,7 +67,10 @@ func (c *Client) fetchTickets(ctx context.Context, jql string) ([]model.Ticket, 
 	return tickets, nil
 }
 
-func (c *Client) FetchAllEpicChildren(ctx context.Context, tickets []model.Ticket) (map[string][]model.Ticket, error) {
+func (c *Client) FetchAllEpicChildren(
+	ctx context.Context,
+	tickets []model.Ticket,
+) (map[string][]model.Ticket, error) {
 	type result struct {
 		epicKey  string
 		children []model.Ticket

@@ -104,8 +104,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case views.SelectTicketMsg,
 		views.GoToListMsg,
 		epicChildrenLoadedMsg,
-		epicChildrenErrorMsg,
-		copilotLaunchedMsg:
+		epicChildrenErrorMsg:
 		return m.updateNavigationMsg(msg)
 
 	case views.TagsFilledMsg,

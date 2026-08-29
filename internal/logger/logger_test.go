@@ -120,11 +120,9 @@ func TestLogger_Concurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := range 100 {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
-			l.Info(fmt.Sprintf("concurrent-%d", n))
-		}(i)
+		wg.Go(func() {
+			l.Info(fmt.Sprintf("concurrent-%d", i))
+		})
 	}
 
 	wg.Wait()

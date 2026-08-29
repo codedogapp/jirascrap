@@ -28,9 +28,6 @@ func (m *AppModel) updateNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case epicChildrenErrorMsg:
 		return m.handleError(views.ErrMsg{Err: msg.err})
 
-	case copilotLaunchedMsg:
-		return m.handleCopilotLaunched(msg)
-
 	default:
 		return m, nil
 	}
@@ -268,7 +265,9 @@ func (m *AppModel) handleOpenInBrowser(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	ticketURL := fmt.Sprintf("%s/browse/%s", domain, ticket.ID)
 
 	return true, func() tea.Msg {
-		_ = exec.Command("open", ticketURL).Start() // #nosec G204 -- ticketURL is from trusted config
+		_ = exec.Command("open", ticketURL).
+			Start()
+			// #nosec G204 -- ticketURL is from trusted config
 		return nil
 	}
 }

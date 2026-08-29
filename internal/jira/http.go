@@ -19,7 +19,12 @@ const (
 
 // doRequest executes an authenticated request with retry for transient failures.
 // Retries on 429 (rate limit) and 5xx errors with exponential backoff.
-func (c *Client) doRequest(ctx context.Context, method, url string, body any, acceptedStatus ...int) ([]byte, error) {
+func (c *Client) doRequest(
+	ctx context.Context,
+	method, url string,
+	body any,
+	acceptedStatus ...int,
+) ([]byte, error) {
 	jsonBytes, err := marshalBody(body)
 	if err != nil {
 		return nil, err
@@ -49,10 +54,18 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body any, ac
 			return respBody.body, nil
 
 		case responseFail:
-			return nil, fmt.Errorf("jira api error [%d]: %s", respBody.statusCode, string(respBody.body))
+			return nil, fmt.Errorf(
+				"jira api error [%d]: %s",
+				respBody.statusCode,
+				string(respBody.body),
+			)
 
 		case responseRetry:
-			lastErr = fmt.Errorf("jira api error [%d]: %s", respBody.statusCode, string(respBody.body))
+			lastErr = fmt.Errorf(
+				"jira api error [%d]: %s",
+				respBody.statusCode,
+				string(respBody.body),
+			)
 			if wait > 0 {
 				backoff = wait
 			}
@@ -70,7 +83,11 @@ type rawResponse struct {
 }
 
 // executeRequest builds and sends a single HTTP request, returning the raw response.
-func (c *Client) executeRequest(ctx context.Context, method, url string, jsonBytes []byte) (*rawResponse, error) {
+func (c *Client) executeRequest(
+	ctx context.Context,
+	method, url string,
+	jsonBytes []byte,
+) (*rawResponse, error) {
 	var reqBody io.Reader
 	if jsonBytes != nil {
 		reqBody = bytes.NewReader(jsonBytes)
@@ -154,7 +171,11 @@ func marshalBody(body any) ([]byte, error) {
 }
 
 // retryOrBreak sleeps with backoff if retries remain, returns doubled backoff.
-func (c *Client) retryOrBreak(ctx context.Context, attempt int, backoff time.Duration) time.Duration {
+func (c *Client) retryOrBreak(
+	ctx context.Context,
+	attempt int,
+	backoff time.Duration,
+) time.Duration {
 	if attempt < maxRetries-1 {
 		_ = sleepWithContext(ctx, backoff)
 	}

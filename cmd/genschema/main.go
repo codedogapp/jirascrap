@@ -23,7 +23,7 @@ func main() {
 	if err != nil {
 		fatal("open db: %v", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck // best-effort cleanup
 
 	goose.SetBaseFS(migrations.FS)
 	if err := goose.SetDialect("sqlite"); err != nil {
@@ -45,7 +45,7 @@ func main() {
 	if err != nil {
 		fatal("query schema: %v", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // best-effort cleanup
 
 	var stmts []string
 	for rows.Next() {
@@ -60,7 +60,8 @@ func main() {
 	}
 
 	out := header + strings.Join(stmts, "\n")
-	if err := os.WriteFile("internal/store/schema.sql", []byte(out), 0600); err != nil {
+
+	if err := os.WriteFile("internal/store/schema.sql", []byte(out), 0o600); err != nil {
 		fatal("write: %v", err)
 	}
 	fmt.Println("schema.sql generated")

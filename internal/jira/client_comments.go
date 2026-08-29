@@ -9,8 +9,17 @@ import (
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
-func (c *Client) FetchComments(ctx context.Context, issueKey string, maxResults int) ([]model.Comment, int, error) {
-	url := fmt.Sprintf("%s/rest/api/3/issue/%s/comment?orderBy=-created&maxResults=%d", c.domain, issueKey, maxResults)
+func (c *Client) FetchComments(
+	ctx context.Context,
+	issueKey string,
+	maxResults int,
+) ([]model.Comment, int, error) {
+	url := fmt.Sprintf(
+		"%s/rest/api/3/issue/%s/comment?orderBy=-created&maxResults=%d",
+		c.domain,
+		issueKey,
+		maxResults,
+	)
 
 	respBody, err := c.doRequest(ctx, "GET", url, nil)
 	if err != nil {

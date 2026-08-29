@@ -53,7 +53,11 @@ func (c *mockClient) DoTransition(_ context.Context, _ string, _ string) error {
 	return c.doTransErr
 }
 
-func (c *mockClient) FetchComments(_ context.Context, _ string, _ int) ([]model.Comment, int, error) {
+func (c *mockClient) FetchComments(
+	_ context.Context,
+	_ string,
+	_ int,
+) ([]model.Comment, int, error) {
 	return nil, 0, nil
 }
 
@@ -107,12 +111,10 @@ var testEpicChildren = map[string][]model.Ticket{
 }
 
 var testCfg = &config.Config{
-	Domain:           "https://test.atlassian.net",
-	Email:            "test@example.com",
-	APIToken:         "test-token",
-	DBPath:           ":memory:",
-	CopilotWorkspace: "/tmp",
-	CopilotModel:     "test-model",
+	Domain:   "https://test.atlassian.net",
+	Email:    "test@example.com",
+	APIToken: "test-token",
+	DBPath:   ":memory:",
 }
 
 func newTestApp(client *mockClient) *AppModel {
@@ -325,7 +327,11 @@ func TestIntegration_StatusTransition(t *testing.T) {
 		{ID: "21", Name: "Done", ToStatus: "Done", ToStatusCategory: "Done"},
 		{ID: "31", Name: "In Progress", ToStatus: "In Progress", ToStatusCategory: "In Progress"},
 	}
-	client := &mockClient{tickets: testTickets, epicChildren: testEpicChildren, transitions: transitions}
+	client := &mockClient{
+		tickets:      testTickets,
+		epicChildren: testEpicChildren,
+		transitions:  transitions,
+	}
 	app := newTestApp(client)
 	sendSize(t, app, 120, 40)
 	runInit(t, app)

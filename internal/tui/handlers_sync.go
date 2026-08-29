@@ -67,7 +67,9 @@ func (m *AppModel) syncFromJira() tea.Cmd {
 		}
 		for epicKey, children := range epicChildren {
 			if err := m.ticketCache.CacheEpicChildren(epicKey, children); err != nil {
-				logger.Log.Warn(fmt.Sprintf("failed to cache epic children for %s: %v", epicKey, err))
+				logger.Log.Warn(
+					fmt.Sprintf("failed to cache epic children for %s: %v", epicKey, err),
+				)
 			}
 		}
 

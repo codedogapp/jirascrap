@@ -1,5 +1,7 @@
 [tools]
 go = "latest"
+golangci-lint = "latest"
+sonar-scanner-cli = "latest"
 
 [tasks.schema]
 run = "go run ./cmd/genschema"
@@ -27,6 +29,21 @@ description = "Remove build artifacts"
 [tasks.e2e]
 run = "bash e2e/run.sh"
 description = "Run e2e demo tape (requires vhs)"
+
+[tasks.coverage]
+description = "Go test coverage report"
+run = "go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./..."
+
+[tasks.sonar-issues]
+description = "List the backend's unresolved SonarQube issues as a flat, fixable list."
+run = '''
+issues=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?projects=$SONAR_PROJECT&resolved=false&ps=500&s=SEVERITY&asc=false") || {
+  echo "sonar-issues: cannot reach $SONAR_HOST_URL — is SonarQube up and has 'mise run sonar' been run?" >&2
+  exit 1
+}
+echo "# $SONAR_PROJECT: $(printf '%s' "$issues" | jq -r '.total') open issue(s)"
+printf '%s' "$issues" | jq -r '.issues[] | "\(.severity)\t\(.rule)\t\(.component | sub("^[^:]+:";"")):\(.line // 0)\t\(.message)"' | column -t -s "$(printf '\t')"
+'''
 
 [env]
 JIRA_BASE_URL = { required = "Set your organization's Jira Base URL" }

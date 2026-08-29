@@ -24,7 +24,6 @@ func TestNoKeyBindingConflicts(t *testing.T) {
 		{"Refresh", km.Refresh},
 		{"ToggleHelp", km.ToggleHelp},
 		{"OpenInBrowser", km.OpenInBrowser},
-		{"SendToCopilot", km.SendToCopilot},
 		{"AddComment", km.AddComment},
 	}
 
