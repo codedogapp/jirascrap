@@ -57,20 +57,7 @@ func (s *SqliteTicketCache) GetCachedTickets() ([]model.Ticket, error) {
 
 	tickets := make([]model.Ticket, 0, len(rows))
 	for _, r := range rows {
-		tags, _ := r.Tags.(string)
-		t, err := scanTicketRow(ticketRowData{
-			ID:             r.ID,
-			Summary:        r.Summary,
-			Reporter:       r.Reporter,
-			Status:         r.Status,
-			StatusCategory: r.StatusCategory,
-			Priority:       r.Priority,
-			Type:           r.Type,
-			CreatedAt:      r.CreatedAt,
-			UpdatedAt:      r.UpdatedAt,
-			Markdown:       r.Markdown,
-			Tags:           tags,
-		})
+		t, err := scanTicketRow(rowDataFromCached(r))
 		if err != nil {
 			return nil, fmt.Errorf("get cached tickets: %w", err)
 		}
@@ -108,20 +95,7 @@ func (s *SqliteTicketCache) GetAllCachedEpicChildren() (map[string][]model.Ticke
 
 	result := make(map[string][]model.Ticket)
 	for _, r := range rows {
-		tags, _ := r.Tags.(string)
-		t, err := scanTicketRow(ticketRowData{
-			ID:             r.ID,
-			Summary:        r.Summary,
-			Reporter:       r.Reporter,
-			Status:         r.Status,
-			StatusCategory: r.StatusCategory,
-			Priority:       r.Priority,
-			Type:           r.Type,
-			CreatedAt:      r.CreatedAt,
-			UpdatedAt:      r.UpdatedAt,
-			Markdown:       r.Markdown,
-			Tags:           tags,
-		})
+		t, err := scanTicketRow(rowDataFromEpic(r))
 		if err != nil {
 			return nil, fmt.Errorf("get epic children: %w", err)
 		}
@@ -159,6 +133,28 @@ type ticketRowData struct {
 	Priority, Type                 string
 	CreatedAt, UpdatedAt, Markdown string
 	Tags                           string
+}
+
+func rowDataFromCached(r sqlcdb.GetCachedTicketsRow) ticketRowData {
+	tags, _ := r.Tags.(string)
+	return ticketRowData{
+		ID: r.ID, Summary: r.Summary, Reporter: r.Reporter,
+		Status: r.Status, StatusCategory: r.StatusCategory,
+		Priority: r.Priority, Type: r.Type,
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		Markdown: r.Markdown, Tags: tags,
+	}
+}
+
+func rowDataFromEpic(r sqlcdb.GetAllEpicChildrenRow) ticketRowData {
+	tags, _ := r.Tags.(string)
+	return ticketRowData{
+		ID: r.ID, Summary: r.Summary, Reporter: r.Reporter,
+		Status: r.Status, StatusCategory: r.StatusCategory,
+		Priority: r.Priority, Type: r.Type,
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		Markdown: r.Markdown, Tags: tags,
+	}
 }
 
 // scanTicketRow converts raw DB column values into a model.Ticket.

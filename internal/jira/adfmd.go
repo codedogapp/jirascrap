@@ -318,36 +318,45 @@ func cellToMarkdown(cell any) string {
 
 func removeEmptyColumns(table [][]string) [][]string {
 	headerLen := len(table[0])
-	emptyColumns := map[int]bool{}
+	empty := findEmptyColumns(table, headerLen)
+
+	var filtered [][]string
+	for _, row := range table {
+		filtered = append(filtered, filterRow(row, headerLen, empty))
+	}
+	return filtered
+}
+
+func findEmptyColumns(table [][]string, headerLen int) map[int]bool {
+	empty := map[int]bool{}
 	for col := range headerLen {
-		empty := true
+		colEmpty := true
 		for _, row := range table[1:] {
 			if col < len(row) && row[col] != "" {
-				empty = false
+				colEmpty = false
 				break
 			}
 		}
-		if empty {
-			emptyColumns[col] = true
+		if colEmpty {
+			empty[col] = true
 		}
 	}
+	return empty
+}
 
-	var filteredTable [][]string
-	for _, row := range table {
-		var filteredRow []string
-		for i := range headerLen {
-			if emptyColumns[i] {
-				continue
-			}
-			if i < len(row) {
-				filteredRow = append(filteredRow, row[i])
-			} else {
-				filteredRow = append(filteredRow, "")
-			}
+func filterRow(row []string, headerLen int, empty map[int]bool) []string {
+	var out []string
+	for i := range headerLen {
+		if empty[i] {
+			continue
 		}
-		filteredTable = append(filteredTable, filteredRow)
+		if i < len(row) {
+			out = append(out, row[i])
+		} else {
+			out = append(out, "")
+		}
 	}
-	return filteredTable
+	return out
 }
 
 func renderMarkdownTable(table [][]string, prefix string) string {

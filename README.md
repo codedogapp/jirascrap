@@ -1,7 +1,5 @@
 # jirascrap
 
-## Note
-
 A terminal UI for browsing your Jira tickets. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
 Tickets are fetched from the Jira API and cached locally in SQLite. You can tag tickets, manage per-ticket todo lists, filter, and search -- all from the terminal.
