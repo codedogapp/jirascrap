@@ -28,6 +28,10 @@ Rules:
   which of the two you actually ran when you summarise.
 - If the quality gate fails, fix the reported conditions. Do not rationalise a red gate
   away, and do not weaken `sonar-project.properties` exclusions to turn it green.
+- Run `mise run sonar-issues` to read the current findings. The SonarQube Cloud project is
+  private, so this needs `SONAR_TOKEN` set to a Cloud **user** token with Browse permission
+  (an `sqp_` analysis token will not work). The task fails loudly if it cannot read the
+  project — an empty result is never reported as "no issues".
 - Do not reintroduce a local scanner. Scanning an uncommitted working tree from a laptop
   publishes it as a main-branch analysis and corrupts the new-code baseline.
 
@@ -271,6 +275,7 @@ go run .                       # dev run
 mise run generate              # regen sqlc code (only after migration/query changes)
 mise run generate-check        # verify committed sqlc code is current (sqlc diff)
 mise run coverage              # tests + coverage.out (consumed by Sonar in CI)
+mise run sonar-issues          # list open SonarQube Cloud findings (needs SONAR_TOKEN)
 mise run check                 # the full local gate — run this before declaring work done
 bash e2e/run.sh                # e2e demo (needs vhs, ttyd, ffmpeg)
 ```

@@ -9,6 +9,7 @@ import (
 
 	"github.com/codedogapp/jirascrap/internal/store/migrations"
 	"github.com/pressly/goose/v3"
+	// Imported for its side effect: registers the "sqlite" driver named by SQLDriver.
 	_ "modernc.org/sqlite"
 )
 

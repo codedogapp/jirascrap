@@ -7,7 +7,7 @@ MOCK_PORT=18932
 DB_PATH=$(mktemp -t jirascrap-e2e-XXXXXX.db)
 
 cleanup() {
-    if [ -n "${MOCK_PID:-}" ]; then
+    if [[ -n "${MOCK_PID:-}" ]]; then
         kill "$MOCK_PID" 2>/dev/null || true
     fi
     rm -f "$DB_PATH" "$SCRIPT_DIR/mock-server" "$SCRIPT_DIR/jirascrap-e2e" "$SCRIPT_DIR/jirascrap"

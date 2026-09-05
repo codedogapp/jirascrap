@@ -72,7 +72,7 @@ func (m *ListModel) StartSpinner() tea.Cmd {
 	return m.list.StartSpinner()
 }
 
-func (m *ListModel) SetSize(width int, height int) {
+func (m *ListModel) SetSize(width, height int) {
 	w, h := m.style.GetFrameSize()
 	m.list.SetSize(width-w, height-h)
 }
