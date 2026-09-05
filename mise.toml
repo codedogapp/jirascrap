@@ -1,11 +1,44 @@
 [tools]
 go = "latest"
 golangci-lint = "latest"
+jq = "latest"
 sqlc = "1.31.1"
 
 [tasks.generate]
 run = "sqlc generate"
 description = "Regenerate committed sqlc code (run after changing migrations or queries)"
+
+[tasks.sonar-issues]
+description = "List unresolved SonarQube Cloud findings (needs SONAR_TOKEN if project is private)"
+run = '''
+set -euo pipefail
+key=$(sed -n 's/^sonar\.projectKey=//p' sonar-project.properties)
+
+sonar_get() {
+  if [[ -n "${SONAR_TOKEN:-}" ]]; then
+    curl -sf -u "${SONAR_TOKEN}:" "$1"
+  else
+    curl -sf "$1"
+  fi
+}
+
+if ! sonar_get "https://sonarcloud.io/api/components/show?component=${key}" >/dev/null; then
+  echo "error: cannot read SonarQube Cloud project '${key}'." >&2
+  if [[ -z "${SONAR_TOKEN:-}" ]]; then
+    echo "It is private or does not exist. Set SONAR_TOKEN in mise.local.toml." >&2
+  elif [[ "$(curl -sf -u "${SONAR_TOKEN}:" https://sonarcloud.io/api/authentication/validate | jq -r .valid)" != "true" ]]; then
+    echo "SONAR_TOKEN is not a valid SonarQube Cloud token. Generate a user token at" >&2
+    echo "https://sonarcloud.io/account/security (an 'sqp_' analysis token will not work)." >&2
+  else
+    echo "SONAR_TOKEN is valid but lacks Browse permission on the project." >&2
+  fi
+  exit 1
+fi
+
+sonar_get "https://sonarcloud.io/api/issues/search?componentKeys=${key}&resolved=false&ps=200" |
+  jq -r '.issues[] | "\(.severity)\t\(.rule)\t\(.component | sub("^[^:]*:"; ""))\tL\(.line // 0)\t\(.message)"' |
+  sort
+'''
 
 [tasks.generate-check]
 run = "sqlc diff"
