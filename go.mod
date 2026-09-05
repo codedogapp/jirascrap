@@ -7,7 +7,7 @@ require (
 	charm.land/bubbletea/v2 v2.0.9
 	charm.land/glamour/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.0.6
-	github.com/pressly/goose/v3 v3.27.3
+	github.com/pressly/goose/v3 v3.28.0
 	modernc.org/sqlite v1.58.0
 )
 
