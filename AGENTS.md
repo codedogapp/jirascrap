@@ -4,8 +4,8 @@
 
 ## Definition of Done — read this first
 
-**No development task is complete until SonarQube has analysed the change and its quality
-gate passes.** Running the build and tests is not sufficient.
+**No development task is complete until `mise run check` passes.** Building and eyeballing
+the diff is not sufficient.
 
 After finishing any code change, run:
 
@@ -13,24 +13,23 @@ After finishing any code change, run:
 mise run check
 ```
 
-That is the gate. It runs, in order: `gofmt` → `go vet` → `golangci-lint` → `sqlc diff` →
-`mise run sonar` (tests with coverage + scanner upload) → `mise run sonar-gate` (blocks
-until SonarQube finishes processing, then asserts the quality gate is green).
+That is the local gate. It runs, in order: `gofmt` → `go vet` → `golangci-lint` →
+`sqlc diff` → `go test -race`.
+
+Static analysis is **SonarQube Cloud, running in GitHub Actions** — there is no local
+SonarQube. The `sonar` job scans every push to `main` and every pull request and fails the
+build when the quality gate is red (`-Dsonar.qualitygate.wait=true`).
 
 Rules:
 
 - Do **not** report work as finished before `mise run check` has passed.
-- If the quality gate fails, fix the reported conditions and re-run. Do not rationalise a
-  red gate away.
-- Use `mise run sonar-issues` to list the specific findings to fix.
-- If SonarQube is unreachable, the Sonar steps **soft-skip with a warning** rather than
-  failing. That warning is not a pass. Say so explicitly in your summary, e.g. "tests and
-  lint pass; Sonar gate skipped — SonarQube was not running."
-- Never delete or weaken `sonar-project.properties` exclusions to make the gate go green.
-
-SonarQube runs locally (`SONAR_HOST_URL`, `SONAR_TOKEN`, `SONAR_PROJECT` come from the
-gitignored `mise.local.toml`). It is not part of GitHub Actions, so CI cannot catch what
-this gate catches — that is exactly why the local gate is mandatory.
+- `mise run check` is necessary but not sufficient. The Sonar gate only exists in CI, so
+  once a change is pushed, the `SonarQube Cloud` job is the authoritative verdict. Say
+  which of the two you actually ran when you summarise.
+- If the quality gate fails, fix the reported conditions. Do not rationalise a red gate
+  away, and do not weaken `sonar-project.properties` exclusions to turn it green.
+- Do not reintroduce a local scanner. Scanning an uncommitted working tree from a laptop
+  publishes it as a main-branch analysis and corrupts the new-code baseline.
 
 ## Architecture
 
@@ -271,32 +270,29 @@ go test ./...                  # all tests
 go run .                       # dev run
 mise run generate              # regen sqlc code (only after migration/query changes)
 mise run generate-check        # verify committed sqlc code is current (sqlc diff)
-mise run coverage              # tests + coverage.out (consumed by Sonar)
-mise run sonar                 # coverage + publish analysis to SonarQube
-mise run sonar-gate            # wait for analysis, assert quality gate is green
-mise run sonar-issues          # list unresolved Sonar findings
-mise run check                 # the full gate — run this before declaring work done
+mise run coverage              # tests + coverage.out (consumed by Sonar in CI)
+mise run check                 # the full local gate — run this before declaring work done
 bash e2e/run.sh                # e2e demo (needs vhs, ttyd, ffmpeg)
 ```
 
-All Sonar tasks are thin wrappers over `scripts/sonar.sh {scan|gate|issues}`. That script
-holds the shared preflight logic:
-
-| Situation | Behaviour |
-|---|---|
-| `SONAR_HOST_URL` / `SONAR_TOKEN` unset | soft-skip, exit 0 (Sonar not configured) |
-| Server unreachable | soft-skip, exit 0 (with warning) |
-| Server still `STARTING` | waits up to 60s, then soft-skips |
-| Server up, token rejected | **hard fail** — misconfiguration, not an outage |
-| Stale `.scannerwork/report-task.txt` | **hard fail** — tells you to re-run `mise run sonar` |
-| Quality gate `ERROR` | **hard fail** — prints each failing condition + dashboard URL |
-
 ## CI
 
-`.github/workflows/ci.yml`, two jobs:
+`.github/workflows/ci.yml`, three jobs:
 
 - `test` — checkout → setup Go → gofmt check → build → vet → test (`-race`) → coverage artifact → gosec
 - `codegen` — checkout → setup sqlc (version read from `mise.toml`) → `sqlc diff` to catch stale committed generated code
+- `sonar` — checkout (`fetch-depth: 0`) → setup Go → test with coverage → `SonarSource/sonarqube-scan-action` with `-Dsonar.qualitygate.wait=true`
+
+The `sonar` job needs the `SONAR_TOKEN` repository secret. No `SONAR_HOST_URL` is set —
+the scan action defaults to SonarQube Cloud. Project and organization keys live in
+`sonar-project.properties`.
+
+**Automatic Analysis must stay off** (project → Administration → Analysis Method). Sonar
+refuses to run both analysis methods: with Automatic Analysis enabled, the CI-based
+analysis fails and takes the build down with it. Automatic Analysis also ignores
+`sonar-project.properties` entirely and cannot ingest coverage, so it would silently drop
+the `**/sqlcdb/**` exclusion and all coverage data. CI-based analysis is the deliberate
+choice here for exactly those two reasons.
 
 ## Dependencies
 
@@ -313,6 +309,7 @@ holds the shared preflight logic:
 - Always update README, mock server (`e2e/mock_server.go`), and e2e tape (`e2e/demo.tape`) when adding new features
 - After editing `internal/store/migrations/` or `internal/store/queries/`, run `mise run generate` and **commit** the regenerated `internal/store/sqlcdb/` — CI fails otherwise
 - Never add sqlc back as a Go `tool` directive; it belongs in `mise.toml`
+- Never enable SonarQube Cloud's Automatic Analysis — it conflicts with the CI `sonar` job and fails the build
 - Never hand-edit `internal/store/sqlcdb/` — it is excluded from golangci-lint and Sonar
 - Migrations are append-only: add a new numbered file, never edit an applied one
 - New global key bindings must be added to the conflict test in `keymaps_test.go`

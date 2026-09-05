@@ -32,3 +32,4 @@ e2e/mock-server
 .idea
 
 .scannerwork/
+coverage.out

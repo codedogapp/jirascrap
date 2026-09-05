@@ -129,19 +129,23 @@ up to date in a separate job.
 
 ### Code quality gate
 
-Static analysis runs against a local SonarQube instance. Set `SONAR_HOST_URL`,
-`SONAR_TOKEN` and `SONAR_PROJECT` in `mise.local.toml` (gitignored), then:
+Run this before considering a change complete:
 
 ```
 mise run check
 ```
 
-This is the gate to run before considering a change complete. It chains `gofmt`, `go vet`,
-`golangci-lint`, `sqlc diff`, a Sonar analysis, and a quality-gate assertion. Individual
-steps are available as `mise run sonar`, `mise run sonar-gate` and `mise run sonar-issues`.
+It chains `gofmt`, `go vet`, `golangci-lint`, `sqlc diff` and the test suite with `-race`.
+It needs no network and no external services.
 
-If SonarQube is not running, the Sonar steps warn and skip rather than failing, so the task
-still works offline -- but the gate has not actually been enforced in that case.
+Static analysis is handled by SonarQube Cloud from GitHub Actions, not locally. The `sonar`
+CI job scans each push to `main` and each pull request and fails the build if the quality
+gate is red. It requires a `SONAR_TOKEN` repository secret; the project and organization
+keys are in `sonar-project.properties`.
+
+SonarQube Cloud's **Automatic Analysis must be turned off** for this project (Administration
+→ Analysis Method). It cannot run alongside CI-based analysis, and it ignores
+`sonar-project.properties` and coverage reports.
 
 Run the e2e demo (requires [vhs](https://github.com/charmbracelet/vhs), ttyd, and ffmpeg):
 

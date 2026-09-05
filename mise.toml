@@ -1,7 +1,6 @@
 [tools]
 go = "latest"
 golangci-lint = "latest"
-sonar-scanner-cli = "latest"
 sqlc = "1.31.1"
 
 [tasks.generate]
@@ -32,29 +31,15 @@ description = "Run e2e demo tape (requires vhs)"
 description = "Go test coverage report"
 run = "go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./..."
 
-[tasks.sonar]
-description = "Run tests with coverage and publish analysis to SonarQube"
-depends = ["coverage"]
-run = "bash scripts/sonar.sh scan"
-
-[tasks.sonar-gate]
-description = "Fail if the SonarQube quality gate for the last analysis is not passing"
-run = "bash scripts/sonar.sh gate"
-
-[tasks.sonar-issues]
-description = "List the project's unresolved SonarQube issues as a flat, fixable list."
-run = "bash scripts/sonar.sh issues"
-
 [tasks.check]
-description = "Post-development gate: format, vet, lint, tests, codegen drift, Sonar quality gate"
+description = "Post-development gate: format, vet, lint, codegen drift, tests"
 run = """
 set -euo pipefail
 test -z "$(gofmt -l .)" || { echo 'not formatted:'; gofmt -l .; exit 1; }
 go vet ./...
 golangci-lint run ./...
 sqlc diff
-mise run sonar
-mise run sonar-gate
+go test -race ./... -count=1
 """
 
 [env]
