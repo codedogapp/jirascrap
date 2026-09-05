@@ -7,7 +7,7 @@ import (
 	"github.com/codedogapp/jirascrap/internal/model"
 )
 
-func TestSaveMeta_TagsJoinedInGetCachedTickets(t *testing.T) {
+func TestSaveTags_TagsJoinedInGetCachedTickets(t *testing.T) {
 	s := setupTestDB(t)
 	now := time.Now().Truncate(time.Second)
 
@@ -15,7 +15,7 @@ func TestSaveMeta_TagsJoinedInGetCachedTickets(t *testing.T) {
 		{ID: "TICK-1", Summary: "First", Type: "Task", CreatedAt: now, UpdatedAt: now},
 	})
 	if err := s.Tags.SaveTags("TICK-1", []string{"bug", "urgent"}); err != nil {
-		t.Fatalf("SaveMeta: %v", err)
+		t.Fatalf("SaveTags: %v", err)
 	}
 
 	tickets, err := s.Tickets.GetCachedTickets()
@@ -30,7 +30,7 @@ func TestSaveMeta_TagsJoinedInGetCachedTickets(t *testing.T) {
 	}
 }
 
-func TestSaveMeta_Overwrite(t *testing.T) {
+func TestSaveTags_Overwrite(t *testing.T) {
 	s := setupTestDB(t)
 	now := time.Now().Truncate(time.Second)
 
@@ -46,7 +46,7 @@ func TestSaveMeta_Overwrite(t *testing.T) {
 	}
 }
 
-func TestSaveMeta_EmptyTags(t *testing.T) {
+func TestSaveTags_EmptyTags(t *testing.T) {
 	s := setupTestDB(t)
 	now := time.Now().Truncate(time.Second)
 
@@ -62,7 +62,7 @@ func TestSaveMeta_EmptyTags(t *testing.T) {
 	}
 }
 
-func TestSaveMeta_MultipleTickets(t *testing.T) {
+func TestSaveTags_MultipleTickets(t *testing.T) {
 	s := setupTestDB(t)
 	now := time.Now().Truncate(time.Second)
 

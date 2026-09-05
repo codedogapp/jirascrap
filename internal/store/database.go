@@ -1,6 +1,6 @@
 package store
 
-//go:generate go tool sqlc generate -f ../../sqlc.yaml
+//go:generate sqlc generate -f ../../sqlc.yaml
 
 import (
 	"database/sql"

@@ -52,11 +52,15 @@ linters:
           - unparam
     paths:
       - e2e
+      - internal/store/sqlcdb
 
 formatters:
   enable:
     - gofumpt
     - golines
+  exclusions:
+    paths:
+      - internal/store/sqlcdb
   settings:
     golines:
       max-len: 100

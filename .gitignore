@@ -31,8 +31,4 @@ e2e/mock-server
 
 .idea
 
-# sqlc generated code (regenerated via `mise run generate`)
-internal/store/sqlcdb/
-internal/store/schema.sql
-
 .scannerwork/

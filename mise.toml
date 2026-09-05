@@ -2,24 +2,22 @@
 go = "latest"
 golangci-lint = "latest"
 sonar-scanner-cli = "latest"
-
-[tasks.schema]
-run = "go run ./cmd/genschema"
-description = "Generate schema.sql from goose migrations"
+sqlc = "1.31.1"
 
 [tasks.generate]
-run = "go tool sqlc generate"
-depends = ["schema"]
-description = "Run sqlc codegen"
+run = "sqlc generate"
+description = "Regenerate committed sqlc code (run after changing migrations or queries)"
+
+[tasks.generate-check]
+run = "sqlc diff"
+description = "Verify committed sqlc code is up to date"
 
 [tasks.build]
 run = "go build -o jirascrap.out ."
-depends = ["generate"]
 description = "Build the jirascrap binary"
 
 [tasks.run]
 run = "go run ."
-depends = ["generate"]
 description = "Run without building"
 
 [tasks.clean]
@@ -34,16 +32,30 @@ description = "Run e2e demo tape (requires vhs)"
 description = "Go test coverage report"
 run = "go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./..."
 
+[tasks.sonar]
+description = "Run tests with coverage and publish analysis to SonarQube"
+depends = ["coverage"]
+run = "bash scripts/sonar.sh scan"
+
+[tasks.sonar-gate]
+description = "Fail if the SonarQube quality gate for the last analysis is not passing"
+run = "bash scripts/sonar.sh gate"
+
 [tasks.sonar-issues]
-description = "List the backend's unresolved SonarQube issues as a flat, fixable list."
-run = '''
-issues=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?projects=$SONAR_PROJECT&resolved=false&ps=500&s=SEVERITY&asc=false") || {
-  echo "sonar-issues: cannot reach $SONAR_HOST_URL — is SonarQube up and has 'mise run sonar' been run?" >&2
-  exit 1
-}
-echo "# $SONAR_PROJECT: $(printf '%s' "$issues" | jq -r '.total') open issue(s)"
-printf '%s' "$issues" | jq -r '.issues[] | "\(.severity)\t\(.rule)\t\(.component | sub("^[^:]+:";"")):\(.line // 0)\t\(.message)"' | column -t -s "$(printf '\t')"
-'''
+description = "List the project's unresolved SonarQube issues as a flat, fixable list."
+run = "bash scripts/sonar.sh issues"
+
+[tasks.check]
+description = "Post-development gate: format, vet, lint, tests, codegen drift, Sonar quality gate"
+run = """
+set -euo pipefail
+test -z "$(gofmt -l .)" || { echo 'not formatted:'; gofmt -l .; exit 1; }
+go vet ./...
+golangci-lint run ./...
+sqlc diff
+mise run sonar
+mise run sonar-gate
+"""
 
 [env]
 JIRA_BASE_URL = { required = "Set your organization's Jira Base URL" }

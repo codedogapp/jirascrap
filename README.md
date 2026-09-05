@@ -8,7 +8,7 @@ Tickets are fetched from the Jira API and cached locally in SQLite. You can tag 
 
 ## Requirements
 
-- Go 1.22+
+- Go 1.27+
 - A Jira Cloud instance with API access
 
 ## Installation
@@ -42,6 +42,7 @@ jirascrap
 | ----- | -------- |
 | `enter` | Select ticket |
 | `esc` | Go back / close popup |
+| `H` | Return to the root ticket list |
 | `t` | Tag current ticket |
 | `n` | Open todo list |
 | `a` | Add comment (in detail view) |
@@ -98,6 +99,49 @@ Run tests:
 ```
 go test ./...
 ```
+
+### Database and code generation
+
+The SQLite schema is defined by goose migrations in `internal/store/migrations/`. These
+migrations are the single source of truth: goose applies them at runtime, and
+[sqlc](https://sqlc.dev) reads them directly to generate database access code from the
+queries in `internal/store/queries/`.
+
+The generated package `internal/store/sqlcdb/` is committed, so `go build ./...` and
+`go test ./...` work on a fresh clone with no code generation step and no extra tooling.
+
+Regenerate only after changing a migration or a query file:
+
+```
+mise run generate
+```
+
+Commit the resulting diff. To check for drift without writing files:
+
+```
+mise run generate-check
+```
+
+sqlc is installed as a mise tool rather than a Go tool dependency, which keeps its large
+transitive dependency tree out of `go.mod`. The version is pinned in `mise.toml`; CI reads
+that same value, so local and CI codegen always agree. CI verifies the committed output is
+up to date in a separate job.
+
+### Code quality gate
+
+Static analysis runs against a local SonarQube instance. Set `SONAR_HOST_URL`,
+`SONAR_TOKEN` and `SONAR_PROJECT` in `mise.local.toml` (gitignored), then:
+
+```
+mise run check
+```
+
+This is the gate to run before considering a change complete. It chains `gofmt`, `go vet`,
+`golangci-lint`, `sqlc diff`, a Sonar analysis, and a quality-gate assertion. Individual
+steps are available as `mise run sonar`, `mise run sonar-gate` and `mise run sonar-issues`.
+
+If SonarQube is not running, the Sonar steps warn and skip rather than failing, so the task
+still works offline -- but the gate has not actually been enforced in that case.
 
 Run the e2e demo (requires [vhs](https://github.com/charmbracelet/vhs), ttyd, and ffmpeg):
 

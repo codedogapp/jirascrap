@@ -19,12 +19,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Generate schema
-        run: go run ./cmd/genschema
-
-      - name: Generate
-        run: go tool sqlc generate
-
       - name: Check formatting
         run: |
           if [ -n "$(gofmt -l .)" ]; then
@@ -52,3 +46,26 @@ jobs:
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           gosec -quiet ./...
+
+  codegen:
+    name: Codegen up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve sqlc version from mise.toml
+        id: sqlc
+        run: |
+          version="$(sed -n 's/^sqlc = "\(.*\)"$/\1/p' mise.toml)"
+          if [ -z "$version" ]; then
+            echo "could not resolve sqlc version from mise.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: ${{ steps.sqlc.outputs.version }}
+
+      - name: Check sqlc output is up to date
+        run: sqlc diff
